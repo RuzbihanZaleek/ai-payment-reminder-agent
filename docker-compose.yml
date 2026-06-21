@@ -1,0 +1,41 @@
+services:
+
+  app:
+    container_name: payment_reminder_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - .:/app
+
+    env_file:
+      - .env
+
+    depends_on:
+      - postgres
+
+
+  postgres:
+    container_name: payment_reminder_db
+
+    image: postgres:16
+
+    ports:
+      - "5432:5432"
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: payment_reminder
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+
+volumes:
+
+  postgres_data:
