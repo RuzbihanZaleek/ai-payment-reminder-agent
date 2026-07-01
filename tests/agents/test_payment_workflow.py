@@ -1,6 +1,7 @@
 from app.agents.payment_workflow import PaymentWorkflow
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.state import AgentState
+from app.agents.confidence_checker import ConfidenceChecker
 
 
 class FakePaymentAgent:
@@ -22,7 +23,8 @@ class FakePaymentAgent:
 def test_payment_workflow():
 
     workflow = PaymentWorkflow(
-        FakePaymentAgent()
+        FakePaymentAgent(),
+        ConfidenceChecker()
     )
 
     state = AgentState(
