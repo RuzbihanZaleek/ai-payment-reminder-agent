@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base
 from app.models.mixins import TimestampMixin, IdMixin
 
+from sqlalchemy.orm import relationship
+
 class ContractStatus(str, Enum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
@@ -55,4 +57,10 @@ class Contract(Base, IdMixin, TimestampMixin):
     whatsapp_chat_id: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+    )
+    
+    payments = relationship(
+        "Payment",
+        back_populates="contract",
+        cascade="all, delete-orphan",
     )
