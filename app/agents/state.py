@@ -1,32 +1,45 @@
-from typing import TypedDict, Optional
+from typing import Optional
 from datetime import date
 from decimal import Decimal
 
+from pydantic import BaseModel
 
-class AgentState(TypedDict):
+from app.schemas.payment_detection import PaymentDetectionResult
+
+
+class AgentState(BaseModel):
+
+    # Incoming message
+    message: str
+    message_id: Optional[str] = None
+
+    # AI detection result
+    payment_detection: Optional[PaymentDetectionResult] = None
+
+    detected_payment_amount: Optional[Decimal] = None
+
 
     # Contract information
-    contract_id: int
-    whatsapp_chat_id: str
+    contract_id: Optional[int] = None
+    whatsapp_chat_id: Optional[str] = None
+
 
     # Financial information
-    total_amount: Decimal
-    daily_amount: Decimal
-    total_paid: Decimal
-    remaining_amount: Decimal
+    total_amount: Optional[Decimal] = None
+    daily_amount: Optional[Decimal] = None
+    total_paid: Optional[Decimal] = None
+    remaining_amount: Optional[Decimal] = None
 
-    # Pending payment information
-    pending_dates: list[date]
-    pending_amount: Decimal
 
-    # Incoming WhatsApp message
-    message_id: Optional[str]
-    incoming_message: Optional[str]
-    detected_payment_amount: Optional[Decimal]
+    # Pending payments
+    pending_dates: list[date] = []
+    pending_amount: Optional[Decimal] = None
+
 
     # Approval workflow
-    requires_approval: bool
-    approval_status: Optional[str]
+    requires_approval: bool = False
+    approval_status: Optional[str] = None
+
 
     # Generated response
-    generated_message: Optional[str]
+    generated_message: Optional[str] = None
