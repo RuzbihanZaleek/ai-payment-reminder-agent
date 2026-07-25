@@ -15,7 +15,9 @@ class PaymentCreate(BaseModel):
         gt=0
     )
 
-    payment_date: date
+    payment_date: date = Field(
+        default_factory=date.today
+    )
 
     source: PaymentSource = PaymentSource.MANUAL
 

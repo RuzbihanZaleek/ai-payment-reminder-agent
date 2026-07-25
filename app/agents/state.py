@@ -43,3 +43,6 @@ class AgentState(BaseModel):
 
     # Generated response
     generated_message: Optional[str] = None
+    
+    # Payment creation result
+    payment_id: Optional[int] = None
