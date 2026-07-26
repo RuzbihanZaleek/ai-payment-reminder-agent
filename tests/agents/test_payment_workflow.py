@@ -58,17 +58,31 @@ class FakeBalanceUpdateNode:
         return state
 
 
+class FakeReminderDecisionNode:
+
+    def __init__(self):
+        self.executed = False
+
+    def execute(self, state):
+
+        self.executed = True
+
+        return state
+
+
 def test_payment_workflow():
 
     confidence_checker = FakeConfidenceChecker()
     payment_creation_node = FakePaymentCreationNode()
     balance_update_node = FakeBalanceUpdateNode()
+    reminder_decision_node = FakeReminderDecisionNode()
 
     workflow = PaymentWorkflow(
         FakePaymentAgent(),
         confidence_checker,
         payment_creation_node,
-        balance_update_node
+        balance_update_node,
+        reminder_decision_node
     )
 
     state = AgentState(
@@ -96,3 +110,6 @@ def test_payment_workflow():
     # Final state contains updated balance
     assert result.total_paid == 350
     assert result.remaining_amount == 650
+
+    # Reminder decision node is executed
+    assert reminder_decision_node.executed is True

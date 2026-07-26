@@ -5,6 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.schemas.payment_detection import PaymentDetectionResult
+from app.enums.reminder_decision import ReminderDecision
 
 
 class AgentState(BaseModel):
@@ -43,6 +44,9 @@ class AgentState(BaseModel):
 
     # Generated response
     generated_message: Optional[str] = None
-    
+
     # Payment creation result
     payment_id: Optional[int] = None
+
+    # Reminder decision
+    decision: ReminderDecision = ReminderDecision.NONE

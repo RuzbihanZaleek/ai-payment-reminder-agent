@@ -1,0 +1,9 @@
+from enum import Enum
+
+class ReminderDecision(str, Enum):
+
+    NONE = "NONE"
+    SEND_REMINDER = "SEND_REMINDER"
+    NO_REMINDER = "NO_REMINDER"
+    WAIT_FOR_APPROVAL = "WAIT_FOR_APPROVAL"
+    CONTRACT_COMPLETED = "CONTRACT_COMPLETED"
