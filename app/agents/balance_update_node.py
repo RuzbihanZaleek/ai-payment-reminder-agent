@@ -29,6 +29,10 @@ class BalanceUpdateNode:
         if contract is None:
             return state
 
+        # Hydrate contract-derived fields onto the state so downstream
+        # nodes (e.g. NotificationNode) don't need the contract object.
+        state.whatsapp_chat_id = contract.whatsapp_chat_id
+
         state.total_amount = contract.total_amount
         state.daily_amount = contract.daily_amount
 

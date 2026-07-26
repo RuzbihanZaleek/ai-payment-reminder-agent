@@ -6,9 +6,10 @@ from app.agents.state import AgentState
 
 class FakeContract:
 
-    def __init__(self, total_amount, daily_amount):
+    def __init__(self, total_amount, daily_amount, whatsapp_chat_id="chat_123"):
         self.total_amount = total_amount
         self.daily_amount = daily_amount
+        self.whatsapp_chat_id = whatsapp_chat_id
 
 
 class FakeContractService:
@@ -74,12 +75,13 @@ def test_no_payment_id_skips_calculation():
     assert result.remaining_amount is None
     assert result.total_amount is None
     assert result.daily_amount is None
+    assert result.whatsapp_chat_id is None
 
 
 def test_updates_balance_from_existing_payments():
 
     contract_service = FakeContractService(
-        FakeContract(Decimal("1000"), Decimal("10"))
+        FakeContract(Decimal("1000"), Decimal("10"), whatsapp_chat_id="chat_123")
     )
     payment_service = FakePaymentService(
         Decimal("350")
@@ -101,7 +103,11 @@ def test_updates_balance_from_existing_payments():
     assert payment_service.total_paid_called is True
     assert payment_service.remaining_called is True
 
+    # Balance calculations remain unchanged
     assert result.total_amount == Decimal("1000")
     assert result.daily_amount == Decimal("10")
     assert result.total_paid == Decimal("350")
     assert result.remaining_amount == Decimal("650")
+
+    # Contract chat id is hydrated onto the state
+    assert result.whatsapp_chat_id == "chat_123"
