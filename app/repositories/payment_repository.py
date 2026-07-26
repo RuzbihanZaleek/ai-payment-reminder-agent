@@ -28,7 +28,20 @@ class PaymentRepository:
             .filter(Payment.contract_id == contract_id)
             .all()
         )
-        
+
+    def get_by_approval_status( self, approval_status ) -> list[Payment]:
+        return (
+            self.db.query(Payment)
+            .filter(Payment.approval_status == approval_status)
+            .all()
+        )
+
+    def update( self, payment: Payment ) -> Payment:
+        self.db.commit()
+        self.db.refresh(payment)
+
+        return payment
+
     def delete( self, payment: Payment) -> None:
         self.db.delete(payment)
         self.db.commit()

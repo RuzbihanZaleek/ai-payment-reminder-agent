@@ -146,6 +146,13 @@ class PassthroughWorkflowExecutor:
         pass
 
 
+class NoopApprovalNode:
+
+    def execute(self, state):
+
+        return state
+
+
 def test_workflow_integration():
 
     service = RecordingNotificationService(result=True)
@@ -153,6 +160,7 @@ def test_workflow_integration():
     workflow = PaymentWorkflow(
         PaymentDetectionNode(FakePaymentAgent()),
         ConfidenceCheckerNode(FakeConfidenceChecker()),
+        NoopApprovalNode(),
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),
         FakeReminderDecisionNode(),

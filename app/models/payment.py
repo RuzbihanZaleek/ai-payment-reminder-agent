@@ -15,6 +15,7 @@ from sqlalchemy.orm import relationship
 from app.models.base import Base
 from app.enums.payment_status import PaymentStatus
 from app.enums.payment_source import PaymentSource
+from app.enums.approval_status import ApprovalStatus
 
 class Payment(Base):
 
@@ -29,7 +30,9 @@ class Payment(Base):
     payment_date = Column( Date, nullable=False )
     
     status = Column( Enum(PaymentStatus), nullable=False, default=PaymentStatus.PENDING )
-    
+
+    approval_status = Column( Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.PENDING )
+
     source = Column( Enum(PaymentSource), nullable=False, default=PaymentSource.MANUAL )
     
     reference_message_id = Column( String(255), nullable=True )

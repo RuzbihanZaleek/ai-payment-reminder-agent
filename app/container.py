@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.services.payment_service import PaymentService
 from app.services.contract_service import ContractService
 from app.services.whatsapp_notification_service import WhatsAppNotificationService
+from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
@@ -17,6 +18,7 @@ from app.agents.confidence_checker import ConfidenceChecker
 
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
+from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
@@ -68,6 +70,7 @@ def create_agent_execution_service(
     # Nodes.
     payment_detection_node = PaymentDetectionNode(payment_agent)
     confidence_checker_node = ConfidenceCheckerNode(confidence_checker)
+    approval_creation_node = ApprovalCreationNode(payment_service)
     payment_creation_node = PaymentCreationNode(payment_service)
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
     reminder_decision_node = ReminderDecisionNode()
@@ -84,6 +87,7 @@ def create_agent_execution_service(
     payment_workflow = PaymentWorkflow(
         payment_detection_node,
         confidence_checker_node,
+        approval_creation_node,
         payment_creation_node,
         balance_update_node,
         reminder_decision_node,
@@ -97,3 +101,16 @@ def create_agent_execution_service(
         agent_run_repository,
         payment_workflow,
     )
+
+
+def create_payment_approval_service(
+    db=None,
+) -> PaymentApprovalService:
+    """Compose the human-approval service used by the approval API."""
+
+    if db is None:
+        db = SessionLocal()
+
+    payment_repository = PaymentRepository(db)
+
+    return PaymentApprovalService(payment_repository)
