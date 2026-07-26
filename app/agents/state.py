@@ -50,3 +50,7 @@ class AgentState(BaseModel):
 
     # Reminder decision
     decision: ReminderDecision = ReminderDecision.NONE
+
+    # Notification result
+    notification_sent: bool = False
+    notification_status: Optional[str] = None

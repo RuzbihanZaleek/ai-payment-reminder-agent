@@ -1,9 +1,11 @@
 from decimal import Decimal
 
 from app.agents.payment_workflow import PaymentWorkflow
+from app.agents.notification_node import NotificationNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.state import AgentState
+from app.services.notification_service import FakeNotificationService
 from app.enums.reminder_decision import ReminderDecision
 from app.schemas.payment_detection import (
     PaymentDetectionResult,
@@ -126,6 +128,7 @@ def test_workflow_integration():
         FakeBalanceUpdateNode(),
         ReminderDecisionNode(),
         ResponseGenerationNode(),
+        NotificationNode(FakeNotificationService()),
     )
 
     state = AgentState(

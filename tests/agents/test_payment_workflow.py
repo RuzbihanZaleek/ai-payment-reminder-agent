@@ -83,6 +83,20 @@ class FakeResponseGenerationNode:
         return state
 
 
+class FakeNotificationNode:
+
+    def __init__(self):
+        self.executed = False
+
+    def execute(self, state):
+
+        self.executed = True
+        state.notification_sent = True
+        state.notification_status = "SENT"
+
+        return state
+
+
 def test_payment_workflow():
 
     confidence_checker = FakeConfidenceChecker()
@@ -90,6 +104,7 @@ def test_payment_workflow():
     balance_update_node = FakeBalanceUpdateNode()
     reminder_decision_node = FakeReminderDecisionNode()
     response_generation_node = FakeResponseGenerationNode()
+    notification_node = FakeNotificationNode()
 
     workflow = PaymentWorkflow(
         FakePaymentAgent(),
@@ -97,7 +112,8 @@ def test_payment_workflow():
         payment_creation_node,
         balance_update_node,
         reminder_decision_node,
-        response_generation_node
+        response_generation_node,
+        notification_node
     )
 
     state = AgentState(
@@ -132,3 +148,8 @@ def test_payment_workflow():
     # Response generation node is executed
     assert response_generation_node.executed is True
     assert result.generated_message == "response"
+
+    # Notification node is executed
+    assert notification_node.executed is True
+    assert result.notification_sent is True
+    assert result.notification_status == "SENT"
