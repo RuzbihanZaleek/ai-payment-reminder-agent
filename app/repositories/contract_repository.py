@@ -43,6 +43,20 @@ class ContractRepository:
         )
 
 
+    def get_by_whatsapp_chat_id(
+        self,
+        whatsapp_chat_id: str
+    ) -> Contract | None:
+
+        return (
+            self.db.query(Contract)
+            .filter(
+                Contract.whatsapp_chat_id == whatsapp_chat_id
+            )
+            .first()
+        )
+
+
     def delete(
         self,
         contract: Contract
