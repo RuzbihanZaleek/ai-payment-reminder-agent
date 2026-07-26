@@ -44,15 +44,31 @@ class FakePaymentCreationNode:
         return state
 
 
+class FakeBalanceUpdateNode:
+
+    def __init__(self):
+        self.executed = False
+
+    def execute(self, state):
+
+        self.executed = True
+        state.total_paid = 350
+        state.remaining_amount = 650
+
+        return state
+
+
 def test_payment_workflow():
 
     confidence_checker = FakeConfidenceChecker()
     payment_creation_node = FakePaymentCreationNode()
+    balance_update_node = FakeBalanceUpdateNode()
 
     workflow = PaymentWorkflow(
         FakePaymentAgent(),
         confidence_checker,
-        payment_creation_node
+        payment_creation_node,
+        balance_update_node
     )
 
     state = AgentState(
@@ -73,3 +89,10 @@ def test_payment_workflow():
 
     # Final state contains payment_id
     assert result.payment_id == 42
+
+    # Balance update node is executed
+    assert balance_update_node.executed is True
+
+    # Final state contains updated balance
+    assert result.total_paid == 350
+    assert result.remaining_amount == 650
