@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str = ""
     WHATSAPP_ACCESS_TOKEN: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
-    WHATSAPP_API_VERSION: str = "v21.0"
+    WHATSAPP_API_VERSION: str = "v25.0"
 
     model_config = SettingsConfigDict(
         env_file=".env",
