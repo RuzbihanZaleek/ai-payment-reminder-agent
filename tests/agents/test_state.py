@@ -1,5 +1,13 @@
 from decimal import Decimal
 from app.agents.state import AgentState
+from app.enums.trigger_type import TriggerType
+
+
+def test_default_trigger_type_is_message():
+
+    state = AgentState(message="Paid 100")
+
+    assert state.trigger_type == TriggerType.MESSAGE
 
 
 def test_agent_state_structure():

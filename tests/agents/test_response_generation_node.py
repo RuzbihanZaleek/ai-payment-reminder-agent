@@ -36,8 +36,9 @@ def test_approval_message():
     result = node.execute(state)
 
     assert result.generated_message == (
-        "Thanks for your payment update. Your payment is awaiting "
-        "approval before it is applied to your balance."
+        "Thanks. I received your payment details.\n"
+        "They are currently pending approval.\n"
+        "I'll update the balance once it is confirmed."
     )
 
 

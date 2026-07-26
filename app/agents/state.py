@@ -6,9 +6,13 @@ from pydantic import BaseModel
 
 from app.schemas.payment_detection import PaymentDetectionResult
 from app.enums.reminder_decision import ReminderDecision
+from app.enums.trigger_type import TriggerType
 
 
 class AgentState(BaseModel):
+
+    # What triggered this run
+    trigger_type: TriggerType = TriggerType.MESSAGE
 
     # Incoming message
     message: str

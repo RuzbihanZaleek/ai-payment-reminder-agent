@@ -12,6 +12,8 @@ from app.services.contract_service import ContractService
 from app.services.whatsapp_notification_service import WhatsAppNotificationService
 from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
+from app.services.reminder_service import ReminderService
+from app.services.reminder_execution_service import ReminderExecutionService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -114,3 +116,40 @@ def create_payment_approval_service(
     payment_repository = PaymentRepository(db)
 
     return PaymentApprovalService(payment_repository)
+
+
+def create_reminder_service(
+    db=None,
+) -> ReminderService:
+    """Compose the service that decides which contracts are due a reminder."""
+
+    if db is None:
+        db = SessionLocal()
+
+    contract_service = ContractService(ContractRepository(db))
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return ReminderService(contract_service, payment_service)
+
+
+def create_reminder_execution_service(
+    db=None,
+    llm=None,
+) -> ReminderExecutionService:
+    """Compose the service that runs the workflow for a scheduled reminder.
+
+    Reuses the workflow + run repository from the agent execution stack so
+    reminders and messages share the same wiring and session.
+    """
+
+    if db is None:
+        db = SessionLocal()
+
+    agent_execution_service = create_agent_execution_service(db=db, llm=llm)
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return ReminderExecutionService(
+        agent_execution_service.agent_run_repository,
+        agent_execution_service.payment_workflow,
+        payment_service,
+    )

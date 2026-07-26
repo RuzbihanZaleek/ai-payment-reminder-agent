@@ -15,8 +15,9 @@ class ResponseGenerationNode:
 
         if decision == ReminderDecision.WAIT_FOR_APPROVAL:
             state.generated_message = (
-                "Thanks for your payment update. Your payment is awaiting "
-                "approval before it is applied to your balance."
+                "Thanks. I received your payment details.\n"
+                "They are currently pending approval.\n"
+                "I'll update the balance once it is confirmed."
             )
 
         elif decision == ReminderDecision.CONTRACT_COMPLETED:
