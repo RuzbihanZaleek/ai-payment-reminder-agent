@@ -5,9 +5,11 @@ from app.repositories.agent_event_repository import AgentEventRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.contract_repository import ContractRepository
 
+from app.core.config import settings
+
 from app.services.payment_service import PaymentService
 from app.services.contract_service import ContractService
-from app.services.notification_service import NotificationService
+from app.services.whatsapp_notification_service import WhatsAppNotificationService
 from app.services.agent_execution_service import AgentExecutionService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
@@ -47,7 +49,11 @@ def create_agent_execution_service(
     # Services.
     payment_service = PaymentService(payment_repository)
     contract_service = ContractService(contract_repository)
-    notification_service = NotificationService()
+    notification_service = WhatsAppNotificationService(
+        access_token=settings.WHATSAPP_ACCESS_TOKEN,
+        phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
+        api_version=settings.WHATSAPP_API_VERSION,
+    )
 
     # Agents.
     if llm is None:
