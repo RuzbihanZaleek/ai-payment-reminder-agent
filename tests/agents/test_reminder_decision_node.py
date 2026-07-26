@@ -119,6 +119,16 @@ class FakeBalanceUpdateNode:
         return state
 
 
+class PassthroughWorkflowExecutor:
+
+    def execute_node(self, agent_run_id, node_name, node, state):
+
+        return node.execute(state)
+
+    def mark_run_completed(self, agent_run_id):
+        pass
+
+
 def test_workflow_integration():
 
     workflow = PaymentWorkflow(
@@ -129,13 +139,14 @@ def test_workflow_integration():
         ReminderDecisionNode(),
         ResponseGenerationNode(),
         NotificationNode(FakeNotificationService()),
+        PassthroughWorkflowExecutor(),
     )
 
     state = AgentState(
         message="I paid 100",
     )
 
-    result = workflow.process(state)
+    result = workflow.process(state, agent_run_id=1)
 
     # The real decision node ran last and recorded a decision.
     # Approval not required, balance remaining, payment detected -> NO_REMINDER.

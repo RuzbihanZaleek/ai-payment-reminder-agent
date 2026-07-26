@@ -97,6 +97,23 @@ class FakeNotificationNode:
         return state
 
 
+class FakeWorkflowExecutor:
+
+    def __init__(self):
+        self.executed_nodes = []
+        self.completed_run_id = None
+
+    def execute_node(self, agent_run_id, node_name, node, state):
+
+        self.executed_nodes.append(node_name)
+
+        return node.execute(state)
+
+    def mark_run_completed(self, agent_run_id):
+
+        self.completed_run_id = agent_run_id
+
+
 def test_payment_workflow():
 
     confidence_checker = FakeConfidenceChecker()
@@ -105,6 +122,7 @@ def test_payment_workflow():
     reminder_decision_node = FakeReminderDecisionNode()
     response_generation_node = FakeResponseGenerationNode()
     notification_node = FakeNotificationNode()
+    workflow_executor = FakeWorkflowExecutor()
 
     workflow = PaymentWorkflow(
         FakePaymentAgent(),
@@ -113,14 +131,15 @@ def test_payment_workflow():
         balance_update_node,
         reminder_decision_node,
         response_generation_node,
-        notification_node
+        notification_node,
+        workflow_executor
     )
 
     state = AgentState(
         message="Paid 100"
     )
 
-    result = workflow.process(state)
+    result = workflow.process(state, agent_run_id=123)
 
     # Payment detection is added to state
     assert result.payment_detection is not None
@@ -153,3 +172,15 @@ def test_payment_workflow():
     assert notification_node.executed is True
     assert result.notification_sent is True
     assert result.notification_status == "SENT"
+
+    # Every node is routed through the executor, in unchanged order
+    assert workflow_executor.executed_nodes == [
+        "PaymentCreationNode",
+        "BalanceUpdateNode",
+        "ReminderDecisionNode",
+        "ResponseGenerationNode",
+        "NotificationNode",
+    ]
+
+    # A successful workflow marks the run completed with the given run id
+    assert workflow_executor.completed_run_id == 123

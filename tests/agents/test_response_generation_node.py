@@ -155,6 +155,16 @@ class FakeReminderDecisionNode:
         return state
 
 
+class PassthroughWorkflowExecutor:
+
+    def execute_node(self, agent_run_id, node_name, node, state):
+
+        return node.execute(state)
+
+    def mark_run_completed(self, agent_run_id):
+        pass
+
+
 def test_workflow_integration():
 
     workflow = PaymentWorkflow(
@@ -165,13 +175,14 @@ def test_workflow_integration():
         FakeReminderDecisionNode(),
         ResponseGenerationNode(),
         NotificationNode(FakeNotificationService()),
+        PassthroughWorkflowExecutor(),
     )
 
     state = AgentState(
         message="I paid 100",
     )
 
-    result = workflow.process(state)
+    result = workflow.process(state, agent_run_id=1)
 
     # The real response node ran last and rendered the NO_REMINDER template.
     assert result.generated_message == (

@@ -134,6 +134,16 @@ class FakeResponseGenerationNode:
         return state
 
 
+class PassthroughWorkflowExecutor:
+
+    def execute_node(self, agent_run_id, node_name, node, state):
+
+        return node.execute(state)
+
+    def mark_run_completed(self, agent_run_id):
+        pass
+
+
 def test_workflow_integration():
 
     service = RecordingNotificationService(result=True)
@@ -146,6 +156,7 @@ def test_workflow_integration():
         FakeReminderDecisionNode(),
         FakeResponseGenerationNode(),
         NotificationNode(service),
+        PassthroughWorkflowExecutor(),
     )
 
     state = AgentState(
@@ -153,7 +164,7 @@ def test_workflow_integration():
         whatsapp_chat_id="chat_123",
     )
 
-    result = workflow.process(state)
+    result = workflow.process(state, agent_run_id=1)
 
     # The real notification node ran last and delivered the message.
     assert service.calls == [("chat_123", "Thanks for your payment.")]

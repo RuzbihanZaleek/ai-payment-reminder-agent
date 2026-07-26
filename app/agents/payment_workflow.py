@@ -6,6 +6,7 @@ from app.agents.balance_update_node import BalanceUpdateNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.notification_node import NotificationNode
+from app.agents.workflow_executor import WorkflowExecutor
 
 
 class PaymentWorkflow:
@@ -19,6 +20,7 @@ class PaymentWorkflow:
         reminder_decision_node: ReminderDecisionNode,
         response_generation_node: ResponseGenerationNode,
         notification_node: NotificationNode,
+        workflow_executor: WorkflowExecutor,
     ):
         self.payment_agent = payment_agent
         self.confidence_checker = confidence_checker
@@ -27,9 +29,10 @@ class PaymentWorkflow:
         self.reminder_decision_node = reminder_decision_node
         self.response_generation_node = response_generation_node
         self.notification_node = notification_node
+        self.workflow_executor = workflow_executor
 
 
-    def process(self, state: AgentState) -> AgentState:
+    def process(self, state: AgentState, agent_run_id: int) -> AgentState:
 
         detection = self.payment_agent.analyze_message(
             state.message
@@ -39,14 +42,57 @@ class PaymentWorkflow:
 
         state = self.confidence_checker.check(state)
 
-        state = self.payment_creation_node.execute(state)
+        state = self._execute_node(
+            agent_run_id,
+            "PaymentCreationNode",
+            self.payment_creation_node,
+            state,
+        )
 
-        state = self.balance_update_node.execute(state)
+        state = self._execute_node(
+            agent_run_id,
+            "BalanceUpdateNode",
+            self.balance_update_node,
+            state,
+        )
 
-        state = self.reminder_decision_node.execute(state)
+        state = self._execute_node(
+            agent_run_id,
+            "ReminderDecisionNode",
+            self.reminder_decision_node,
+            state,
+        )
 
-        state = self.response_generation_node.execute(state)
+        state = self._execute_node(
+            agent_run_id,
+            "ResponseGenerationNode",
+            self.response_generation_node,
+            state,
+        )
 
-        state = self.notification_node.execute(state)
+        state = self._execute_node(
+            agent_run_id,
+            "NotificationNode",
+            self.notification_node,
+            state,
+        )
+
+        # All nodes succeeded -> the run as a whole is complete.
+        self.workflow_executor.mark_run_completed(agent_run_id)
 
         return state
+
+    def _execute_node(
+        self,
+        agent_run_id: int,
+        node_name: str,
+        node,
+        state: AgentState,
+    ) -> AgentState:
+
+        return self.workflow_executor.execute_node(
+            agent_run_id,
+            node_name,
+            node,
+            state,
+        )
