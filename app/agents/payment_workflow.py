@@ -1,6 +1,6 @@
 from app.agents.state import AgentState
-from app.agents.payment_message_agent import PaymentMessageAgent
-from app.agents.confidence_checker import ConfidenceChecker
+from app.agents.payment_detection_node import PaymentDetectionNode
+from app.agents.confidence_checker_node import ConfidenceCheckerNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
@@ -13,8 +13,8 @@ class PaymentWorkflow:
 
     def __init__(
         self,
-        payment_agent: PaymentMessageAgent,
-        confidence_checker: ConfidenceChecker,
+        payment_detection_node: PaymentDetectionNode,
+        confidence_checker_node: ConfidenceCheckerNode,
         payment_creation_node: PaymentCreationNode,
         balance_update_node: BalanceUpdateNode,
         reminder_decision_node: ReminderDecisionNode,
@@ -22,8 +22,8 @@ class PaymentWorkflow:
         notification_node: NotificationNode,
         workflow_executor: WorkflowExecutor,
     ):
-        self.payment_agent = payment_agent
-        self.confidence_checker = confidence_checker
+        self.payment_detection_node = payment_detection_node
+        self.confidence_checker_node = confidence_checker_node
         self.payment_creation_node = payment_creation_node
         self.balance_update_node = balance_update_node
         self.reminder_decision_node = reminder_decision_node
@@ -34,13 +34,19 @@ class PaymentWorkflow:
 
     def process(self, state: AgentState, agent_run_id: int) -> AgentState:
 
-        detection = self.payment_agent.analyze_message(
-            state.message
+        state = self._execute_node(
+            agent_run_id,
+            "PaymentDetectionNode",
+            self.payment_detection_node,
+            state,
         )
 
-        state.payment_detection = detection
-
-        state = self.confidence_checker.check(state)
+        state = self._execute_node(
+            agent_run_id,
+            "ConfidenceCheckerNode",
+            self.confidence_checker_node,
+            state,
+        )
 
         state = self._execute_node(
             agent_run_id,

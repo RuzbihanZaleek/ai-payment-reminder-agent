@@ -1,4 +1,6 @@
 from app.agents.payment_workflow import PaymentWorkflow
+from app.agents.payment_detection_node import PaymentDetectionNode
+from app.agents.confidence_checker_node import ConfidenceCheckerNode
 from app.agents.state import AgentState
 
 
@@ -125,8 +127,8 @@ def test_payment_workflow():
     workflow_executor = FakeWorkflowExecutor()
 
     workflow = PaymentWorkflow(
-        FakePaymentAgent(),
-        confidence_checker,
+        PaymentDetectionNode(FakePaymentAgent()),
+        ConfidenceCheckerNode(confidence_checker),
         payment_creation_node,
         balance_update_node,
         reminder_decision_node,
@@ -173,8 +175,10 @@ def test_payment_workflow():
     assert result.notification_sent is True
     assert result.notification_status == "SENT"
 
-    # Every node is routed through the executor, in unchanged order
+    # All seven steps are routed through the executor, in unchanged order
     assert workflow_executor.executed_nodes == [
+        "PaymentDetectionNode",
+        "ConfidenceCheckerNode",
         "PaymentCreationNode",
         "BalanceUpdateNode",
         "ReminderDecisionNode",
