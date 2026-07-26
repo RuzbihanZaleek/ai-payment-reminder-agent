@@ -4,6 +4,7 @@ from app.agents.confidence_checker import ConfidenceChecker
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
+from app.agents.response_generation_node import ResponseGenerationNode
 
 
 class PaymentWorkflow:
@@ -15,12 +16,14 @@ class PaymentWorkflow:
         payment_creation_node: PaymentCreationNode,
         balance_update_node: BalanceUpdateNode,
         reminder_decision_node: ReminderDecisionNode,
+        response_generation_node: ResponseGenerationNode,
     ):
         self.payment_agent = payment_agent
         self.confidence_checker = confidence_checker
         self.payment_creation_node = payment_creation_node
         self.balance_update_node = balance_update_node
         self.reminder_decision_node = reminder_decision_node
+        self.response_generation_node = response_generation_node
 
 
     def process(self, state: AgentState) -> AgentState:
@@ -38,5 +41,7 @@ class PaymentWorkflow:
         state = self.balance_update_node.execute(state)
 
         state = self.reminder_decision_node.execute(state)
+
+        state = self.response_generation_node.execute(state)
 
         return state

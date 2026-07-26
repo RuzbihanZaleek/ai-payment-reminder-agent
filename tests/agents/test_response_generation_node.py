@@ -1,0 +1,178 @@
+from decimal import Decimal
+
+from app.agents.payment_workflow import PaymentWorkflow
+from app.agents.response_generation_node import ResponseGenerationNode
+from app.agents.state import AgentState
+from app.enums.reminder_decision import ReminderDecision
+from app.schemas.payment_detection import (
+    PaymentDetectionResult,
+    PaymentIntent,
+)
+
+
+def make_detection() -> PaymentDetectionResult:
+
+    return PaymentDetectionResult(
+        intent=PaymentIntent.PAYMENT_RECEIVED,
+        amount=Decimal("100.00"),
+        currency="USD",
+        confidence=0.95,
+    )
+
+
+def test_approval_message():
+
+    node = ResponseGenerationNode()
+
+    state = AgentState(
+        message="I paid",
+        decision=ReminderDecision.WAIT_FOR_APPROVAL,
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Thanks for your payment update. Your payment is awaiting "
+        "approval before it is applied to your balance."
+    )
+
+
+def test_completed_message():
+
+    node = ResponseGenerationNode()
+
+    state = AgentState(
+        message="Final payment",
+        decision=ReminderDecision.CONTRACT_COMPLETED,
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Congratulations! Your contract has been fully paid. Thank you."
+    )
+
+
+def test_payment_received_message():
+
+    node = ResponseGenerationNode()
+
+    state = AgentState(
+        message="I paid 100",
+        decision=ReminderDecision.NO_REMINDER,
+        detected_payment_amount=Decimal("100"),
+        remaining_amount=Decimal("2100"),
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Thanks! I've recorded your payment of $100. "
+        "Remaining balance: $2,100."
+    )
+
+
+def test_reminder_message():
+
+    node = ResponseGenerationNode()
+
+    state = AgentState(
+        message="Any update?",
+        decision=ReminderDecision.SEND_REMINDER,
+        remaining_amount=Decimal("850"),
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Friendly reminder: today's payment has not been received. "
+        "Remaining balance: $850."
+    )
+
+
+def test_fallback_behavior():
+
+    node = ResponseGenerationNode()
+
+    # NO_REMINDER but neither the detected amount nor the remaining
+    # balance is available -> must degrade gracefully, not crash.
+    state = AgentState(
+        message="I paid something",
+        decision=ReminderDecision.NO_REMINDER,
+        detected_payment_amount=None,
+        remaining_amount=None,
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == "Thanks! I've recorded your payment."
+    assert "None" not in result.generated_message
+    assert "$" not in result.generated_message
+
+
+class FakePaymentAgent:
+
+    def analyze_message(self, message):
+
+        return make_detection()
+
+
+class FakeConfidenceChecker:
+
+    def check(self, state):
+
+        state.requires_approval = False
+
+        return state
+
+
+class FakePaymentCreationNode:
+
+    def execute(self, state):
+
+        state.payment_id = 42
+
+        return state
+
+
+class FakeBalanceUpdateNode:
+
+    def execute(self, state):
+
+        state.detected_payment_amount = Decimal("100")
+        state.remaining_amount = Decimal("2100")
+
+        return state
+
+
+class FakeReminderDecisionNode:
+
+    def execute(self, state):
+
+        state.decision = ReminderDecision.NO_REMINDER
+
+        return state
+
+
+def test_workflow_integration():
+
+    workflow = PaymentWorkflow(
+        FakePaymentAgent(),
+        FakeConfidenceChecker(),
+        FakePaymentCreationNode(),
+        FakeBalanceUpdateNode(),
+        FakeReminderDecisionNode(),
+        ResponseGenerationNode(),
+    )
+
+    state = AgentState(
+        message="I paid 100",
+    )
+
+    result = workflow.process(state)
+
+    # The real response node ran last and rendered the NO_REMINDER template.
+    assert result.generated_message == (
+        "Thanks! I've recorded your payment of $100. "
+        "Remaining balance: $2,100."
+    )
