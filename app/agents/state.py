@@ -15,9 +15,9 @@ class AgentState(BaseModel):
     message_id: Optional[str] = None
 
     # AI detection result
+    # The detected amount lives on payment_detection.amount — read it there
+    # rather than duplicating it onto the state.
     payment_detection: Optional[PaymentDetectionResult] = None
-
-    detected_payment_amount: Optional[Decimal] = None
 
 
     # Contract information

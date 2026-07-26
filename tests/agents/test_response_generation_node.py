@@ -60,7 +60,7 @@ def test_payment_received_message():
     state = AgentState(
         message="I paid 100",
         decision=ReminderDecision.NO_REMINDER,
-        detected_payment_amount=Decimal("100"),
+        payment_detection=make_detection(),
         remaining_amount=Decimal("2100"),
     )
 
@@ -99,7 +99,7 @@ def test_fallback_behavior():
     state = AgentState(
         message="I paid something",
         decision=ReminderDecision.NO_REMINDER,
-        detected_payment_amount=None,
+        payment_detection=None,
         remaining_amount=None,
     )
 
@@ -139,7 +139,6 @@ class FakeBalanceUpdateNode:
 
     def execute(self, state):
 
-        state.detected_payment_amount = Decimal("100")
         state.remaining_amount = Decimal("2100")
 
         return state

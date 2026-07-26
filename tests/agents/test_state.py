@@ -18,7 +18,6 @@ def test_agent_state_structure():
 
         "message_id": None,
         "incoming_message": None,
-        "detected_payment_amount": None,
 
         "requires_approval": True,
         "approval_status": "PENDING",

@@ -43,7 +43,8 @@ class ResponseGenerationNode:
         state: AgentState,
     ) -> str:
 
-        amount = state.detected_payment_amount
+        detection = state.payment_detection
+        amount = detection.amount if detection is not None else None
         remaining = state.remaining_amount
 
         if amount is not None:
