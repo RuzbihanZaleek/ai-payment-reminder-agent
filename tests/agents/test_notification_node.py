@@ -241,6 +241,13 @@ class NoopApprovalNode:
         return state
 
 
+class NoopReceiptNode:
+
+    def execute(self, state):
+
+        return state
+
+
 def test_workflow_integration():
 
     service = RecordingNotificationService(result=True)
@@ -254,6 +261,7 @@ def test_workflow_integration():
         NoopApprovalNode(),
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),
+        NoopReceiptNode(),
         FakeReminderDecisionNode(),
         FakeResponseGenerationNode(),
         NotificationNode(service, log_repo),

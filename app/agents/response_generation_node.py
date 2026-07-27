@@ -34,7 +34,14 @@ class ResponseGenerationNode:
             )
 
         elif decision == ReminderDecision.NO_REMINDER:
-            state.generated_message = self._payment_received_message(state)
+            message = self._payment_received_message(state)
+
+            # Append the per-contract before/after balances from the receipts.
+            balances = self._updated_balances_section(state)
+            if balances:
+                message = f"{message}\n{balances}"
+
+            state.generated_message = message
 
         elif decision == ReminderDecision.SEND_REMINDER:
             state.generated_message = self._reminder_message(state)
@@ -132,6 +139,28 @@ class ResponseGenerationNode:
             )
 
         return base
+
+    def _updated_balances_section(self, state: AgentState) -> str:
+
+        receipts = state.payment_receipts
+
+        if not receipts:
+            return ""
+
+        lines = ["Updated balances:"]
+
+        for receipt in receipts:
+            reference_code = receipt.get("reference_code") or "Contract"
+            previous_balance = receipt.get("previous_balance")
+            new_balance = receipt.get("new_balance")
+
+            lines.append(f"{reference_code}:")
+            lines.append(
+                f"{self._format_money(previous_balance)} "
+                f"→ {self._format_money(new_balance)}"
+            )
+
+        return "\n".join(lines)
 
     @staticmethod
     def _format_money(amount: Decimal) -> str:

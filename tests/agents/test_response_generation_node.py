@@ -141,6 +141,47 @@ def test_explicit_reference_payment_mentions_contract():
     )
 
 
+def test_payment_response_includes_updated_balances():
+
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
+
+    state = AgentState(
+        message="I paid 70",
+        decision=ReminderDecision.NO_REMINDER,
+        payment_detection=PaymentDetectionResult(
+            intent=PaymentIntent.PAYMENT_RECEIVED,
+            amount=Decimal("70"),
+            currency="USD",
+            confidence=0.95,
+        ),
+        remaining_amount=Decimal("1830"),
+        resolved_contracts=[{"id": 1}, {"id": 2}],
+        payment_allocations=[
+            {"contract_id": 1, "reference_code": "INV001", "amount": Decimal("40")},
+            {"contract_id": 2, "reference_code": "INV002", "amount": Decimal("30")},
+        ],
+        payment_receipts=[
+            {"reference_code": "INV001", "previous_balance": Decimal("900"), "new_balance": Decimal("860")},
+            {"reference_code": "INV002", "previous_balance": Decimal("1000"), "new_balance": Decimal("970")},
+        ],
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Thanks! I've recorded your payment of $70.\n"
+        "Payment allocation:\n"
+        "INV001: $40\n"
+        "INV002: $30\n"
+        "Remaining balance: $1,830.\n"
+        "Updated balances:\n"
+        "INV001:\n"
+        "$900 → $860\n"
+        "INV002:\n"
+        "$1,000 → $970"
+    )
+
+
 def test_reminder_message():
 
     node = ResponseGenerationNode(PaymentAllocationFormatter())
@@ -246,6 +287,13 @@ class NoopApprovalNode:
         return state
 
 
+class NoopReceiptNode:
+
+    def execute(self, state):
+
+        return state
+
+
 class NoopReminderLogRepository:
 
     def create(self, reminder_log):
@@ -263,6 +311,7 @@ def test_workflow_integration():
         NoopApprovalNode(),
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),
+        NoopReceiptNode(),
         FakeReminderDecisionNode(),
         ResponseGenerationNode(PaymentAllocationFormatter()),
         NotificationNode(FakeNotificationService(), NoopReminderLogRepository()),

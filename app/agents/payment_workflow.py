@@ -6,6 +6,7 @@ from app.agents.payment_allocation_node import PaymentAllocationNode
 from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
+from app.agents.payment_receipt_node import PaymentReceiptNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.notification_node import NotificationNode
@@ -23,6 +24,7 @@ class PaymentWorkflow:
         approval_creation_node: ApprovalCreationNode,
         payment_creation_node: PaymentCreationNode,
         balance_update_node: BalanceUpdateNode,
+        payment_receipt_node: PaymentReceiptNode,
         reminder_decision_node: ReminderDecisionNode,
         response_generation_node: ResponseGenerationNode,
         notification_node: NotificationNode,
@@ -35,6 +37,7 @@ class PaymentWorkflow:
         self.approval_creation_node = approval_creation_node
         self.payment_creation_node = payment_creation_node
         self.balance_update_node = balance_update_node
+        self.payment_receipt_node = payment_receipt_node
         self.reminder_decision_node = reminder_decision_node
         self.response_generation_node = response_generation_node
         self.notification_node = notification_node
@@ -42,6 +45,9 @@ class PaymentWorkflow:
 
 
     def process(self, state: AgentState, agent_run_id: int) -> AgentState:
+
+        # Make the run id available to nodes that need it (e.g. receipts).
+        state.agent_run_id = agent_run_id
 
         state = self._execute_node(
             agent_run_id,
@@ -89,6 +95,13 @@ class PaymentWorkflow:
             agent_run_id,
             "BalanceUpdateNode",
             self.balance_update_node,
+            state,
+        )
+
+        state = self._execute_node(
+            agent_run_id,
+            "PaymentReceiptNode",
+            self.payment_receipt_node,
             state,
         )
 

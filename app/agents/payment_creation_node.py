@@ -46,6 +46,10 @@ class PaymentCreationNode:
             created_payment = self.payment_service.create_payment(payment)
             created_ids.append(created_payment.id)
 
+            # Link the created payment back to its allocation so the receipt
+            # node can reference it.
+            allocation["payment_id"] = created_payment.id
+
         # First created id kept for the single-payment gate used downstream.
         if created_ids:
             state.payment_id = created_ids[0]

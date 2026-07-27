@@ -42,6 +42,7 @@ class AgentExecutionService:
             message=message,
             message_id=message_id,
             contract_id=contract_id,
+            agent_run_id=agent_run.id,
             pending_dates=[],
             requires_approval=False,
             conversation_id=conversation_id,

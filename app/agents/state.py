@@ -46,6 +46,10 @@ class AgentState(BaseModel):
     # Human-readable allocation breakdown for the generated response.
     allocation_summary: Optional[str] = None
 
+    # Audit: the workflow's run id, and receipt snapshots per created payment.
+    agent_run_id: Optional[int] = None
+    payment_receipts: list = []
+
 
     # Financial information
     total_amount: Optional[Decimal] = None

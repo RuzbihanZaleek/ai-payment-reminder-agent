@@ -9,6 +9,7 @@ from app.models.scheduler_event import SchedulerEvent
 from app.models.conversation import Conversation
 from app.models.conversation_message import ConversationMessage
 from app.models.conversation_summary import ConversationSummary
+from app.models.payment_receipt import PaymentReceipt
 
 __all__ = [
     "Contract",
@@ -22,4 +23,5 @@ __all__ = [
     "Conversation",
     "ConversationMessage",
     "ConversationSummary",
+    "PaymentReceipt",
 ]

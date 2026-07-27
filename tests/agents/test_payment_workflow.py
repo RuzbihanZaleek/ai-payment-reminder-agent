@@ -96,6 +96,18 @@ class FakeBalanceUpdateNode:
         return state
 
 
+class FakePaymentReceiptNode:
+
+    def __init__(self):
+        self.executed = False
+
+    def execute(self, state):
+
+        self.executed = True
+
+        return state
+
+
 class FakeReminderDecisionNode:
 
     def __init__(self):
@@ -160,6 +172,7 @@ def test_payment_workflow():
     approval_creation_node = FakeApprovalCreationNode()
     payment_creation_node = FakePaymentCreationNode()
     balance_update_node = FakeBalanceUpdateNode()
+    payment_receipt_node = FakePaymentReceiptNode()
     reminder_decision_node = FakeReminderDecisionNode()
     response_generation_node = FakeResponseGenerationNode()
     notification_node = FakeNotificationNode()
@@ -173,6 +186,7 @@ def test_payment_workflow():
         approval_creation_node,
         payment_creation_node,
         balance_update_node,
+        payment_receipt_node,
         reminder_decision_node,
         response_generation_node,
         notification_node,
@@ -226,15 +240,17 @@ def test_payment_workflow():
         "ApprovalCreationNode",
         "PaymentCreationNode",
         "BalanceUpdateNode",
+        "PaymentReceiptNode",
         "ReminderDecisionNode",
         "ResponseGenerationNode",
         "NotificationNode",
     ]
 
-    # Contract resolver + allocation + approval nodes run in the pipeline
+    # Contract resolver + allocation + approval + receipt nodes run in the pipeline
     assert contract_resolver_node.executed is True
     assert payment_allocation_node.executed is True
     assert approval_creation_node.executed is True
+    assert payment_receipt_node.executed is True
 
     # A successful workflow marks the run completed with the given run id
     assert workflow_executor.completed_run_id == 123

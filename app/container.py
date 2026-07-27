@@ -14,6 +14,7 @@ from app.repositories.conversation_message_repository import (
 from app.repositories.conversation_summary_repository import (
     ConversationSummaryRepository,
 )
+from app.repositories.payment_receipt_repository import PaymentReceiptRepository
 
 from app.core.config import settings
 
@@ -22,6 +23,7 @@ from app.services.contract_service import ContractService
 from app.services.whatsapp_notification_service import WhatsAppNotificationService
 from app.services.payment_allocation_service import PaymentAllocationService
 from app.services.payment_allocation_formatter import PaymentAllocationFormatter
+from app.services.payment_receipt_service import PaymentReceiptService
 from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
 from app.services.reminder_service import ReminderService
@@ -39,6 +41,7 @@ from app.agents.payment_allocation_node import PaymentAllocationNode
 from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
+from app.agents.payment_receipt_node import PaymentReceiptNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.notification_node import NotificationNode
@@ -67,11 +70,18 @@ def create_agent_execution_service(
     payment_repository = PaymentRepository(db)
     contract_repository = ContractRepository(db)
     reminder_log_repository = ReminderLogRepository(db)
+    payment_receipt_repository = PaymentReceiptRepository(db)
 
     # Services.
     payment_service = PaymentService(payment_repository)
     contract_service = ContractService(contract_repository)
     payment_allocation_service = PaymentAllocationService(payment_service)
+    payment_receipt_service = PaymentReceiptService(
+        payment_receipt_repository,
+        contract_service,
+        payment_service,
+        PaymentAllocationFormatter(),
+    )
     notification_service = WhatsAppNotificationService(
         access_token=settings.WHATSAPP_ACCESS_TOKEN,
         phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
@@ -96,6 +106,7 @@ def create_agent_execution_service(
     approval_creation_node = ApprovalCreationNode(payment_service)
     payment_creation_node = PaymentCreationNode(payment_service)
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
+    payment_receipt_node = PaymentReceiptNode(payment_receipt_service)
     reminder_decision_node = ReminderDecisionNode()
     response_generation_node = ResponseGenerationNode(
         PaymentAllocationFormatter()
@@ -120,6 +131,7 @@ def create_agent_execution_service(
         approval_creation_node,
         payment_creation_node,
         balance_update_node,
+        payment_receipt_node,
         reminder_decision_node,
         response_generation_node,
         notification_node,
