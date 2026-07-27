@@ -5,6 +5,8 @@ from app.repositories.agent_event_repository import AgentEventRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.contract_repository import ContractRepository
 from app.repositories.reminder_log_repository import ReminderLogRepository
+from app.repositories.scheduler_run_repository import SchedulerRunRepository
+from app.repositories.scheduler_event_repository import SchedulerEventRepository
 
 from app.core.config import settings
 
@@ -214,3 +216,25 @@ def create_reminder_execution_service(
         reminder_workflow,
         payment_service,
     )
+
+
+def create_scheduler_run_repository(
+    db=None,
+) -> SchedulerRunRepository:
+    """Compose the repository that tracks scheduler runs."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return SchedulerRunRepository(db)
+
+
+def create_scheduler_event_repository(
+    db=None,
+) -> SchedulerEventRepository:
+    """Compose the repository that tracks per-contract scheduler events."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return SchedulerEventRepository(db)

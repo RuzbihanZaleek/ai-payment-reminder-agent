@@ -1,6 +1,12 @@
 import app.scheduler as scheduler_module
 
 
+class FakeContract:
+
+    def __init__(self, contract_id):
+        self.id = contract_id
+
+
 class FakeReminderService:
 
     def __init__(self, contracts):
@@ -21,10 +27,63 @@ class FakeReminderExecutionService:
         self.executed.append(contract)
 
 
+class FakeSchedulerRun:
+
+    def __init__(self):
+        self.id = 1
+        self.total_contracts = 0
+        self.successful_count = 0
+        self.failed_count = 0
+        self.completed_at = None
+        self.status = None
+
+
+class FakeSchedulerRunRepository:
+
+    def __init__(self):
+        self.run = FakeSchedulerRun()
+
+    def create(self, scheduler_run):
+
+        return self.run
+
+    def update_status(self, scheduler_run, status):
+
+        scheduler_run.status = status
+
+        return scheduler_run
+
+
+class FakeSchedulerEventRepository:
+
+    def __init__(self):
+        self.events = []
+
+    def create(self, scheduler_event):
+
+        self.events.append(scheduler_event)
+
+        return scheduler_event
+
+
+def _install_tracking(monkeypatch):
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_scheduler_run_repository",
+        lambda: FakeSchedulerRunRepository(),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_scheduler_event_repository",
+        lambda: FakeSchedulerEventRepository(),
+    )
+
+
 def test_scheduler_calls_reminder_job(monkeypatch):
 
-    c1 = object()
-    c2 = object()
+    c1 = FakeContract(1)
+    c2 = FakeContract(2)
 
     reminder_service = FakeReminderService([c1, c2])
     execution_service = FakeReminderExecutionService()
@@ -39,6 +98,7 @@ def test_scheduler_calls_reminder_job(monkeypatch):
         "create_reminder_execution_service",
         lambda: execution_service,
     )
+    _install_tracking(monkeypatch)
 
     scheduler_module.send_daily_reminders()
 
@@ -48,8 +108,8 @@ def test_scheduler_calls_reminder_job(monkeypatch):
 
 def test_reminder_job_continues_after_failure(monkeypatch):
 
-    c1 = object()
-    c2 = object()
+    c1 = FakeContract(1)
+    c2 = FakeContract(2)
 
     reminder_service = FakeReminderService([c1, c2])
 
@@ -74,6 +134,7 @@ def test_reminder_job_continues_after_failure(monkeypatch):
         "create_reminder_execution_service",
         lambda: execution_service,
     )
+    _install_tracking(monkeypatch)
 
     scheduler_module.send_daily_reminders()
 
