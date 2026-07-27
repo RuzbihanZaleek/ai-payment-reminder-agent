@@ -1,11 +1,16 @@
+import time
 from datetime import datetime, timezone
 
 from app.agents.state import AgentState
+from app.core.logger import get_logger
 from app.models.agent_event import AgentEvent
 from app.enums.agent_event_status import AgentEventStatus
 from app.enums.agent_run_status import AgentRunStatus
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.agent_event_repository import AgentEventRepository
+
+
+logger = get_logger(__name__)
 
 
 class WorkflowExecutor:
@@ -32,25 +37,62 @@ class WorkflowExecutor:
             AgentEventStatus.STARTED,
         )
 
+        logger.info(
+            "workflow_node_started",
+            extra={"agent_run_id": agent_run_id, "node_name": node_name},
+        )
+
+        start = time.perf_counter()
+
         try:
             state = node.execute(state)
         except Exception as exc:
+            duration_ms = self._elapsed_ms(start)
+
             self._record_event(
                 agent_run_id,
                 node_name,
                 AgentEventStatus.FAILED,
                 message=str(exc),
+                duration_ms=duration_ms,
             )
             self.mark_run_failed(agent_run_id)
+
+            logger.error(
+                "workflow_node_failed",
+                extra={
+                    "agent_run_id": agent_run_id,
+                    "node_name": node_name,
+                    "duration_ms": duration_ms,
+                    "error": str(exc),
+                },
+            )
             raise
+
+        duration_ms = self._elapsed_ms(start)
 
         self._record_event(
             agent_run_id,
             node_name,
             AgentEventStatus.COMPLETED,
+            duration_ms=duration_ms,
+        )
+
+        logger.info(
+            "workflow_node_completed",
+            extra={
+                "agent_run_id": agent_run_id,
+                "node_name": node_name,
+                "duration_ms": duration_ms,
+            },
         )
 
         return state
+
+    @staticmethod
+    def _elapsed_ms(start: float) -> int:
+
+        return int((time.perf_counter() - start) * 1000)
 
     def mark_run_completed(
         self,
@@ -78,6 +120,7 @@ class WorkflowExecutor:
         node_name: str,
         status: AgentEventStatus,
         message: str | None = None,
+        duration_ms: int | None = None,
     ) -> AgentEvent:
 
         event = AgentEvent(
@@ -85,6 +128,7 @@ class WorkflowExecutor:
             node_name=node_name,
             status=status,
             message=message,
+            duration_ms=duration_ms,
         )
 
         return self.agent_event_repository.create(event)

@@ -26,4 +26,6 @@ class AgentEvent(Base):
 
     message = Column( String(500), nullable=True )
 
+    duration_ms = Column( Integer, nullable=True )
+
     created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )

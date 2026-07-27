@@ -1,11 +1,12 @@
-import logging
+import time
 
 import httpx
 
+from app.core.logger import get_logger
 from app.services.notification_service import NotificationService
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WhatsAppNotificationService(NotificationService):
@@ -45,6 +46,8 @@ class WhatsAppNotificationService(NotificationService):
             },
         }
 
+        start = time.perf_counter()
+
         try:
             response = httpx.post(
                 url,
@@ -52,21 +55,40 @@ class WhatsAppNotificationService(NotificationService):
                 json=payload,
                 timeout=10.0,
             )
-        except Exception:
+        except Exception as exc:
+            duration_ms = int((time.perf_counter() - start) * 1000)
+
             # Delivery failures must never propagate to the workflow.
-            logger.exception(
-                "WhatsApp send request failed for recipient %s",
-                recipient,
+            logger.warning(
+                "whatsapp_message_failed",
+                extra={
+                    "recipient": recipient,
+                    "status_code": None,
+                    "duration_ms": duration_ms,
+                    "error": str(exc),
+                },
             )
             return False
 
+        duration_ms = int((time.perf_counter() - start) * 1000)
+
         if 200 <= response.status_code < 300:
+            logger.info(
+                "whatsapp_message_sent",
+                extra={
+                    "recipient": recipient,
+                    "status_code": response.status_code,
+                    "duration_ms": duration_ms,
+                },
+            )
             return True
 
         logger.warning(
-            "WhatsApp send returned %s for recipient %s: %s",
-            response.status_code,
-            recipient,
-            response.text,
+            "whatsapp_message_failed",
+            extra={
+                "recipient": recipient,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
         )
         return False
