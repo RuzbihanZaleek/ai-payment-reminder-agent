@@ -2,6 +2,7 @@ from datetime import date
 
 from app.agents.state import AgentState
 from app.enums.payment_source import PaymentSource
+from app.enums.approval_status import ApprovalStatus
 from app.models.payment import Payment
 from app.services.payment_service import PaymentService
 
@@ -34,10 +35,14 @@ class PaymentCreationNode:
         created_ids = []
 
         for allocation in state.payment_allocations:
+            # These payments were auto-processed (no manual approval required),
+            # so they are confirmed on creation and count as received.
             payment = Payment(
                 contract_id=allocation["contract_id"],
                 amount=allocation["amount"],
                 payment_date=payment_date,
+                approval_status=ApprovalStatus.APPROVED,
+                requires_manual_review=False,
                 source=PaymentSource.WHATSAPP_AI,
                 reference_message_id=state.message_id,
                 notes=state.message,
