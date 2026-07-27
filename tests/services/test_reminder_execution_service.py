@@ -40,7 +40,8 @@ class FakePaymentService:
         return Decimal("850")
 
 
-class FakeWorkflow:
+class FakeReminderWorkflow:
+    """Stands in for ReminderWorkflow -- note it has NO payment detection."""
 
     def __init__(self):
         self.called_with = None
@@ -63,7 +64,7 @@ def _service(workflow):
 
 def test_reminder_execution_creates_correct_state():
 
-    workflow = FakeWorkflow()
+    workflow = FakeReminderWorkflow()
     service = _service(workflow)
 
     result = service.execute(FakeContract())
@@ -80,12 +81,28 @@ def test_reminder_execution_creates_correct_state():
     assert state.remaining_amount == Decimal("850")
     assert agent_run_id == 1
 
+    # The reminder path never runs PaymentDetectionNode, so no detection
+    # is ever attached to the state.
+    assert state.payment_detection is None
+
     assert result is state
+
+
+def test_uses_reminder_workflow():
+
+    workflow = FakeReminderWorkflow()
+    service = _service(workflow)
+
+    service.execute(FakeContract())
+
+    # Execution is delegated to the injected reminder workflow.
+    assert service.reminder_workflow is workflow
+    assert workflow.called_with is not None
 
 
 def test_trigger_type_is_scheduled_reminder():
 
-    workflow = FakeWorkflow()
+    workflow = FakeReminderWorkflow()
     service = _service(workflow)
 
     service.execute(FakeContract())

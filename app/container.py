@@ -29,6 +29,7 @@ from app.agents.notification_node import NotificationNode
 
 from app.agents.workflow_executor import WorkflowExecutor
 from app.agents.payment_workflow import PaymentWorkflow
+from app.agents.reminder_workflow import ReminderWorkflow
 
 
 def create_agent_execution_service(
@@ -132,24 +133,58 @@ def create_reminder_service(
     return ReminderService(contract_service, payment_service)
 
 
-def create_reminder_execution_service(
+def create_reminder_workflow(
     db=None,
-    llm=None,
-) -> ReminderExecutionService:
-    """Compose the service that runs the workflow for a scheduled reminder.
+) -> ReminderWorkflow:
+    """Compose the message-free workflow used for scheduled reminders.
 
-    Reuses the workflow + run repository from the agent execution stack so
-    reminders and messages share the same wiring and session.
+    Deliberately has no PaymentDetectionNode / ConfidenceChecker -- a reminder
+    has no incoming message to analyse.
     """
 
     if db is None:
         db = SessionLocal()
 
-    agent_execution_service = create_agent_execution_service(db=db, llm=llm)
+    agent_run_repository = AgentRunRepository(db)
+    agent_event_repository = AgentEventRepository(db)
+
+    workflow_executor = WorkflowExecutor(
+        agent_run_repository,
+        agent_event_repository,
+    )
+
+    notification_service = WhatsAppNotificationService(
+        access_token=settings.WHATSAPP_ACCESS_TOKEN,
+        phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
+        api_version=settings.WHATSAPP_API_VERSION,
+    )
+
+    return ReminderWorkflow(
+        ReminderDecisionNode(),
+        ResponseGenerationNode(),
+        NotificationNode(notification_service),
+        workflow_executor,
+    )
+
+
+def create_reminder_execution_service(
+    db=None,
+) -> ReminderExecutionService:
+    """Compose the service that runs the reminder workflow for a contract."""
+
+    if db is None:
+        db = SessionLocal()
+
+    reminder_workflow = create_reminder_workflow(db=db)
+
+    # Share the same AgentRunRepository the workflow's executor uses, so the
+    # run created here and marked completed there refer to the same row.
+    agent_run_repository = reminder_workflow.workflow_executor.agent_run_repository
+
     payment_service = PaymentService(PaymentRepository(db))
 
     return ReminderExecutionService(
-        agent_execution_service.agent_run_repository,
-        agent_execution_service.payment_workflow,
+        agent_run_repository,
+        reminder_workflow,
         payment_service,
     )
