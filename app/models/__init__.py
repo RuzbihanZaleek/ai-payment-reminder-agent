@@ -3,6 +3,7 @@ from app.models.payment import Payment
 from app.models.agent_run import AgentRun
 from app.models.agent_event import AgentEvent
 from app.models.reminder_log import ReminderLog
+from app.models.processed_message import ProcessedMessage
 
 __all__ = [
     "Contract",
@@ -10,4 +11,5 @@ __all__ = [
     "AgentRun",
     "AgentEvent",
     "ReminderLog",
+    "ProcessedMessage",
 ]

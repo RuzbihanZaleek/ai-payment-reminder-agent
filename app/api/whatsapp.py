@@ -6,6 +6,7 @@ from fastapi.responses import PlainTextResponse
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.repositories.contract_repository import ContractRepository
+from app.repositories.processed_message_repository import ProcessedMessageRepository
 from app.services.agent_execution_service import AgentExecutionService
 from app.api.agent import get_agent_execution_service
 
@@ -21,6 +22,16 @@ def get_contract_repository():
 
     try:
         yield ContractRepository(db)
+    finally:
+        db.close()
+
+
+def get_processed_message_repository():
+
+    db = SessionLocal()
+
+    try:
+        yield ProcessedMessageRepository(db)
     finally:
         db.close()
 
@@ -75,6 +86,9 @@ def verify_webhook(
 def receive_webhook(
     payload: dict = Body(...),
     contract_repository: ContractRepository = Depends(get_contract_repository),
+    processed_message_repository: ProcessedMessageRepository = Depends(
+        get_processed_message_repository
+    ),
     service: AgentExecutionService = Depends(get_agent_execution_service),
 ):
 
@@ -85,6 +99,11 @@ def receive_webhook(
         return {"status": "ignored"}
 
     message_id, phone, body = extracted
+
+    # Idempotency: a message we've already processed is acknowledged and dropped
+    # without re-running the workflow.
+    if processed_message_repository.exists(message_id):
+        return {"status": "duplicate"}
 
     contract = contract_repository.get_by_whatsapp_chat_id(phone)
 
@@ -100,9 +119,17 @@ def receive_webhook(
         )
     except Exception:
         # Never surface a non-200 to Meta; just record it for diagnosis.
+        # A failed run is NOT marked processed, so Meta's retry can reprocess it.
         logger.exception(
             "Agent execution failed for message %s",
             message_id,
         )
+        return {"status": "error"}
+
+    # Only mark processed after a successful run.
+    processed_message_repository.create(
+        message_id=message_id,
+        source="whatsapp",
+    )
 
     return {"status": "ok"}

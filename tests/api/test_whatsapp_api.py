@@ -4,7 +4,10 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
 from app.api.agent import get_agent_execution_service
-from app.api.whatsapp import get_contract_repository
+from app.api.whatsapp import (
+    get_contract_repository,
+    get_processed_message_repository,
+)
 
 
 client = TestClient(app)
@@ -45,6 +48,21 @@ class FakeService:
         return None
 
 
+class FakeProcessedMessageRepository:
+
+    def __init__(self, already_seen=False):
+        self.already_seen = already_seen
+        self.created = []
+
+    def exists(self, message_id):
+
+        return self.already_seen
+
+    def create(self, message_id, source):
+
+        self.created.append((message_id, source))
+
+
 def _message_payload(
     message_id="wamid.123",
     phone="15551234567",
@@ -75,19 +93,22 @@ def _message_payload(
 @pytest.fixture
 def overrides():
 
-    installed = {}
-
-    def _install(contract_repository=None, service=None):
+    def _install(contract_repository=None, service=None, processed_repository=None):
         if contract_repository is not None:
             app.dependency_overrides[get_contract_repository] = (
                 lambda: contract_repository
             )
-            installed["repo"] = contract_repository
         if service is not None:
             app.dependency_overrides[get_agent_execution_service] = (
                 lambda: service
             )
-            installed["service"] = service
+
+        # Default to a repository that has never seen the message, so tests
+        # that don't care about idempotency behave as before.
+        processed_repository = processed_repository or FakeProcessedMessageRepository()
+        app.dependency_overrides[get_processed_message_repository] = (
+            lambda: processed_repository
+        )
 
     yield _install
 
