@@ -175,6 +175,13 @@ class NoopApprovalNode:
         return state
 
 
+class NoopReminderLogRepository:
+
+    def create(self, reminder_log):
+
+        return reminder_log
+
+
 def test_workflow_integration():
 
     workflow = PaymentWorkflow(
@@ -185,7 +192,7 @@ def test_workflow_integration():
         FakeBalanceUpdateNode(),
         FakeReminderDecisionNode(),
         ResponseGenerationNode(),
-        NotificationNode(FakeNotificationService()),
+        NotificationNode(FakeNotificationService(), NoopReminderLogRepository()),
         PassthroughWorkflowExecutor(),
     )
 

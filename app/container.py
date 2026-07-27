@@ -52,6 +52,7 @@ def create_agent_execution_service(
     agent_event_repository = AgentEventRepository(db)
     payment_repository = PaymentRepository(db)
     contract_repository = ContractRepository(db)
+    reminder_log_repository = ReminderLogRepository(db)
 
     # Services.
     payment_service = PaymentService(payment_repository)
@@ -80,7 +81,10 @@ def create_agent_execution_service(
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
     reminder_decision_node = ReminderDecisionNode()
     response_generation_node = ResponseGenerationNode()
-    notification_node = NotificationNode(notification_service)
+    notification_node = NotificationNode(
+        notification_service,
+        reminder_log_repository,
+    )
 
     # Infrastructure -- receives the shared AgentRunRepository.
     workflow_executor = WorkflowExecutor(
@@ -168,6 +172,7 @@ def create_reminder_workflow(
 
     agent_run_repository = AgentRunRepository(db)
     agent_event_repository = AgentEventRepository(db)
+    reminder_log_repository = ReminderLogRepository(db)
 
     workflow_executor = WorkflowExecutor(
         agent_run_repository,
@@ -183,7 +188,7 @@ def create_reminder_workflow(
     return ReminderWorkflow(
         ReminderDecisionNode(),
         ResponseGenerationNode(),
-        NotificationNode(notification_service),
+        NotificationNode(notification_service, reminder_log_repository),
         workflow_executor,
     )
 
