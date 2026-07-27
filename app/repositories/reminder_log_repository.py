@@ -18,6 +18,12 @@ class ReminderLogRepository:
 
         return reminder_log
 
+    def get_all( self ) -> list[ReminderLog]:
+        return (
+            self.db.query(ReminderLog)
+            .all()
+        )
+
     def has_sent_today( self, contract_id: int ) -> bool:
         return (
             self.db.query(ReminderLog)

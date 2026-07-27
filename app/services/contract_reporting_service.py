@@ -52,8 +52,14 @@ class ContractReportingService:
             Decimal("0"),
         )
 
+        total_contract_value = sum(
+            (contract.total_amount for contract in contracts),
+            Decimal("0"),
+        )
+
         return {
             "total_contracts": len(contracts),
+            "total_contract_value": total_contract_value,
             "active_contracts": sum(
                 1 for c in contracts if c.status == ContractStatus.ACTIVE
             ),

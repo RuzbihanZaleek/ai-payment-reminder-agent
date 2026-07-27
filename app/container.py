@@ -35,7 +35,13 @@ from app.services.payment_reporting_service import PaymentReportingService
 from app.services.receipt_reporting_service import ReceiptReportingService
 from app.services.agent_reporting_service import AgentReportingService
 from app.services.scheduler_reporting_service import SchedulerReportingService
+from app.services.reminder_reporting_service import ReminderReportingService
 from app.services.dashboard_service import DashboardService
+from app.services.contract_analytics_service import ContractAnalyticsService
+from app.services.payment_analytics_service import PaymentAnalyticsService
+from app.services.reminder_analytics_service import ReminderAnalyticsService
+from app.services.agent_analytics_service import AgentAnalyticsService
+from app.services.analytics_service import AnalyticsService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -375,4 +381,34 @@ def create_dashboard_service(
         create_payment_reporting_service(db=db),
         create_agent_reporting_service(db=db),
         create_scheduler_reporting_service(db=db),
+    )
+
+
+def create_reminder_reporting_service(
+    db=None,
+) -> ReminderReportingService:
+    """Compose the read-only reminder log reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return ReminderReportingService(ReminderLogRepository(db))
+
+
+def create_analytics_service(
+    db=None,
+) -> AnalyticsService:
+    """Compose the analytics service from the existing reporting services."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return AnalyticsService(
+        ContractAnalyticsService(create_contract_reporting_service(db=db)),
+        PaymentAnalyticsService(create_payment_reporting_service(db=db)),
+        ReminderAnalyticsService(
+            create_reminder_reporting_service(db=db),
+            create_scheduler_reporting_service(db=db),
+        ),
+        AgentAnalyticsService(create_agent_reporting_service(db=db)),
     )
