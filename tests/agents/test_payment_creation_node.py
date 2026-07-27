@@ -4,6 +4,7 @@ from decimal import Decimal
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.state import AgentState
 from app.enums.payment_source import PaymentSource
+from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
 
 
@@ -91,7 +92,9 @@ def test_creates_one_payment_per_allocation():
     assert first.reference_message_id == "msg_123"
     assert first.notes == "I paid 100 today"
 
-    # Auto-processed payments are confirmed (APPROVED) and need no manual review.
+    # Auto-processed payments are confirmed (APPROVED, balance-affecting) and
+    # need no manual review.
+    assert first.status == PaymentStatus.APPROVED
     assert first.approval_status == ApprovalStatus.APPROVED
     assert first.requires_manual_review is False
 

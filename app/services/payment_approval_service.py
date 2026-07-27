@@ -49,8 +49,9 @@ class PaymentApprovalService:
         if payment is None:
             return None
 
-        # Rejection only flips the approval flag; the payment status
-        # (e.g. PENDING) is intentionally left unchanged.
+        # Rejection is terminal: both the approval flag and the payment status
+        # become REJECTED so the payment never affects the balance.
         payment.approval_status = ApprovalStatus.REJECTED
+        payment.status = PaymentStatus.REJECTED
 
         return self.payment_repository.update(payment)

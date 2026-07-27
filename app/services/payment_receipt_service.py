@@ -46,18 +46,18 @@ class PaymentReceiptService:
             if reference_code is None and contract is not None:
                 reference_code = contract.reference_code
 
-            # remaining counts APPROVED payments only, so the freshly-created
-            # (PENDING) payment is not yet reflected -> that is the "previous"
-            # balance; applying this payment yields the "new" balance.
+            # The payment is already confirmed (APPROVED) by the time the
+            # receipt runs, so the remaining amount reflects it -> that is the
+            # "new" balance; adding the amount back reconstructs the "previous".
             if contract is not None:
-                previous_balance = self.payment_service.calculate_remaining_amount(
+                new_balance = self.payment_service.calculate_remaining_amount(
                     contract.total_amount,
                     contract_id,
                 )
             else:
-                previous_balance = Decimal("0")
+                new_balance = Decimal("0")
 
-            new_balance = previous_balance - amount
+            previous_balance = new_balance + amount
 
             self.payment_receipt_repository.create(
                 PaymentReceipt(

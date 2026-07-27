@@ -69,8 +69,10 @@ def test_single_contract_receipt():
     assert len(receipts) == 1
     r = receipts[0]
     assert r["reference_code"] == "INV001"
-    assert r["previous_balance"] == Decimal("900")
-    assert r["new_balance"] == Decimal("880")
+    # remaining (900) reflects the already-confirmed payment -> new balance;
+    # previous = new + amount.
+    assert r["new_balance"] == Decimal("900")
+    assert r["previous_balance"] == Decimal("920")
 
     # A PaymentReceipt row was persisted with the audit fields.
     stored = service.payment_receipt_repository.created[0]
@@ -78,8 +80,8 @@ def test_single_contract_receipt():
     assert stored.contract_id == 1
     assert stored.payment_id == 5
     assert stored.amount == Decimal("20")
-    assert stored.previous_balance == Decimal("900")
-    assert stored.new_balance == Decimal("880")
+    assert stored.previous_balance == Decimal("920")
+    assert stored.new_balance == Decimal("900")
 
 
 def test_multiple_contract_receipts():
@@ -101,11 +103,11 @@ def test_multiple_contract_receipts():
 
     assert len(receipts) == 2
     assert receipts[0]["reference_code"] == "INV001"
-    assert receipts[0]["previous_balance"] == Decimal("900")
-    assert receipts[0]["new_balance"] == Decimal("860")
+    assert receipts[0]["new_balance"] == Decimal("900")
+    assert receipts[0]["previous_balance"] == Decimal("940")
     assert receipts[1]["reference_code"] == "INV002"
-    assert receipts[1]["previous_balance"] == Decimal("1000")
-    assert receipts[1]["new_balance"] == Decimal("970")
+    assert receipts[1]["new_balance"] == Decimal("1000")
+    assert receipts[1]["previous_balance"] == Decimal("1030")
 
     # Both audit rows carry the shared allocation summary.
     stored = service.payment_receipt_repository.created

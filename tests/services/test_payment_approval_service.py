@@ -64,10 +64,9 @@ def test_reject_changes_status():
 
     result = service.reject_payment(payment_id=1, rejected_by="reviewer")
 
+    # Rejection is terminal on both axes so the payment never affects balance.
     assert result.approval_status == ApprovalStatus.REJECTED
-
-    # Payment status is intentionally left unchanged on rejection
-    assert result.status == PaymentStatus.PENDING
+    assert result.status == PaymentStatus.REJECTED
     assert repo.updated == [payment]
 
 

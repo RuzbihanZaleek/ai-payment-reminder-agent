@@ -2,6 +2,7 @@ from datetime import date
 
 from app.agents.state import AgentState
 from app.enums.payment_source import PaymentSource
+from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
 from app.models.payment import Payment
 from app.services.payment_service import PaymentService
@@ -41,6 +42,7 @@ class PaymentCreationNode:
                 contract_id=allocation["contract_id"],
                 amount=allocation["amount"],
                 payment_date=payment_date,
+                status=PaymentStatus.APPROVED,
                 approval_status=ApprovalStatus.APPROVED,
                 requires_manual_review=False,
                 source=PaymentSource.WHATSAPP_AI,
