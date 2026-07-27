@@ -1,15 +1,10 @@
-from decimal import Decimal
-
-from app.models.contract import ContractStatus
 from app.services.reminder_service import ReminderService
 
 
 class FakeContract:
 
-    def __init__(self, contract_id, total_amount, status):
+    def __init__(self, contract_id):
         self.id = contract_id
-        self.total_amount = total_amount
-        self.status = status
 
 
 class FakeContractService:
@@ -22,45 +17,45 @@ class FakeContractService:
         return self.contracts
 
 
-class FakePaymentService:
+class FakeReminderPolicyService:
+    """Approves only the contract ids it was configured with."""
 
-    def __init__(self, remaining_by_contract):
-        self.remaining_by_contract = remaining_by_contract
+    def __init__(self, approved_ids):
+        self.approved_ids = approved_ids
+        self.checked = []
 
-    def calculate_remaining_amount(self, total_amount, contract_id):
+    def should_send_reminder(self, contract):
 
-        return self.remaining_by_contract[contract_id]
+        self.checked.append(contract.id)
 
-
-def test_pending_contracts_returned():
-
-    active_with_balance = FakeContract(1, Decimal("1000"), ContractStatus.ACTIVE)
-
-    contract_service = FakeContractService([active_with_balance])
-    payment_service = FakePaymentService({1: Decimal("500")})
-
-    service = ReminderService(contract_service, payment_service)
-
-    assert service.get_pending_reminders() == [active_with_balance]
+        return contract.id in self.approved_ids
 
 
-def test_completed_contracts_ignored():
+def test_returns_only_policy_approved_contracts():
 
-    active_with_balance = FakeContract(1, Decimal("1000"), ContractStatus.ACTIVE)
-    completed = FakeContract(2, Decimal("1000"), ContractStatus.COMPLETED)
-    active_fully_paid = FakeContract(3, Decimal("1000"), ContractStatus.ACTIVE)
+    c1 = FakeContract(1)
+    c2 = FakeContract(2)
+    c3 = FakeContract(3)
 
-    contract_service = FakeContractService(
-        [active_with_balance, completed, active_fully_paid]
-    )
-    payment_service = FakePaymentService(
-        {
-            1: Decimal("500"),   # active + owes -> reminder
-            2: Decimal("500"),   # completed -> ignored despite balance
-            3: Decimal("0"),     # active but fully paid -> ignored
-        }
-    )
+    contract_service = FakeContractService([c1, c2, c3])
+    policy = FakeReminderPolicyService(approved_ids={1, 3})
 
-    service = ReminderService(contract_service, payment_service)
+    service = ReminderService(contract_service, policy)
 
-    assert service.get_pending_reminders() == [active_with_balance]
+    result = service.get_pending_reminders()
+
+    # Only the policy-approved contracts come back...
+    assert result == [c1, c3]
+
+    # ...and every contract was run through the policy.
+    assert policy.checked == [1, 2, 3]
+
+
+def test_no_contracts_when_policy_rejects_all():
+
+    contract_service = FakeContractService([FakeContract(1), FakeContract(2)])
+    policy = FakeReminderPolicyService(approved_ids=set())
+
+    service = ReminderService(contract_service, policy)
+
+    assert service.get_pending_reminders() == []

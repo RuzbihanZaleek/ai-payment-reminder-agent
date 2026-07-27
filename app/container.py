@@ -4,6 +4,7 @@ from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.agent_event_repository import AgentEventRepository
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.contract_repository import ContractRepository
+from app.repositories.reminder_log_repository import ReminderLogRepository
 
 from app.core.config import settings
 
@@ -13,6 +14,7 @@ from app.services.whatsapp_notification_service import WhatsAppNotificationServi
 from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
 from app.services.reminder_service import ReminderService
+from app.services.reminder_policy_service import ReminderPolicyService
 from app.services.reminder_execution_service import ReminderExecutionService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
@@ -119,6 +121,25 @@ def create_payment_approval_service(
     return PaymentApprovalService(payment_repository)
 
 
+def create_reminder_policy_service(
+    db=None,
+) -> ReminderPolicyService:
+    """Compose the policy that holds the reminder business rules."""
+
+    if db is None:
+        db = SessionLocal()
+
+    payment_repository = PaymentRepository(db)
+    payment_service = PaymentService(payment_repository)
+    reminder_log_repository = ReminderLogRepository(db)
+
+    return ReminderPolicyService(
+        payment_service,
+        payment_repository,
+        reminder_log_repository,
+    )
+
+
 def create_reminder_service(
     db=None,
 ) -> ReminderService:
@@ -128,9 +149,9 @@ def create_reminder_service(
         db = SessionLocal()
 
     contract_service = ContractService(ContractRepository(db))
-    payment_service = PaymentService(PaymentRepository(db))
+    reminder_policy_service = create_reminder_policy_service(db=db)
 
-    return ReminderService(contract_service, payment_service)
+    return ReminderService(contract_service, reminder_policy_service)
 
 
 def create_reminder_workflow(

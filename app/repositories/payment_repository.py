@@ -36,6 +36,15 @@ class PaymentRepository:
             .all()
         )
 
+    def has_payment_for_date( self, contract_id: int, payment_date ) -> bool:
+        return (
+            self.db.query(Payment)
+            .filter(Payment.contract_id == contract_id)
+            .filter(Payment.payment_date == payment_date)
+            .first()
+            is not None
+        )
+
     def update( self, payment: Payment ) -> Payment:
         self.db.commit()
         self.db.refresh(payment)
