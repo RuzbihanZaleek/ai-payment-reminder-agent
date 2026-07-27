@@ -19,13 +19,17 @@ class FakeContract:
 
     def __init__(self, contract_id=7):
         self.id = contract_id
+        self.reference_code = "INV001"
+        self.total_amount = 1000
+        self.daily_amount = 10
+        self.whatsapp_chat_id = "chat"
 
 
 class FakeContractRepository:
 
-    def get_by_whatsapp_chat_id(self, whatsapp_chat_id):
+    def get_active_by_whatsapp_chat_id(self, whatsapp_chat_id):
 
-        return FakeContract()
+        return [FakeContract()]
 
 
 class FakeProcessedMessageRepository:
@@ -91,6 +95,7 @@ class FakeService:
         message,
         conversation_id=None,
         conversation_history=None,
+        resolved_contracts=None,
     ):
 
         self.calls.append(

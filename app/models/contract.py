@@ -21,6 +21,12 @@ class Contract(Base, IdMixin, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    reference_code: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=False,
+    )
+
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     description: Mapped[str | None] = mapped_column(String(500))

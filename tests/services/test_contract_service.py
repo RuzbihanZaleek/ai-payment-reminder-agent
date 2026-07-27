@@ -29,6 +29,7 @@ def test_create_contract():
 
 
     contract_data = ContractCreate(
+        reference_code="INV001",
         name="Friend Payment",
         total_amount=Decimal("2200"),
         daily_amount=Decimal("20"),

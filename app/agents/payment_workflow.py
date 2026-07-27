@@ -1,6 +1,7 @@
 from app.agents.state import AgentState
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
+from app.agents.contract_resolver_node import ContractResolverNode
 from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
@@ -16,6 +17,7 @@ class PaymentWorkflow:
         self,
         payment_detection_node: PaymentDetectionNode,
         confidence_checker_node: ConfidenceCheckerNode,
+        contract_resolver_node: ContractResolverNode,
         approval_creation_node: ApprovalCreationNode,
         payment_creation_node: PaymentCreationNode,
         balance_update_node: BalanceUpdateNode,
@@ -26,6 +28,7 @@ class PaymentWorkflow:
     ):
         self.payment_detection_node = payment_detection_node
         self.confidence_checker_node = confidence_checker_node
+        self.contract_resolver_node = contract_resolver_node
         self.approval_creation_node = approval_creation_node
         self.payment_creation_node = payment_creation_node
         self.balance_update_node = balance_update_node
@@ -48,6 +51,13 @@ class PaymentWorkflow:
             agent_run_id,
             "ConfidenceCheckerNode",
             self.confidence_checker_node,
+            state,
+        )
+
+        state = self._execute_node(
+            agent_run_id,
+            "ContractResolverNode",
+            self.contract_resolver_node,
             state,
         )
 

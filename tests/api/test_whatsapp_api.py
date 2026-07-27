@@ -47,8 +47,12 @@ class FakeConversationMemoryService:
 
 class FakeContract:
 
-    def __init__(self, contract_id):
+    def __init__(self, contract_id, reference_code="INV001"):
         self.id = contract_id
+        self.reference_code = reference_code
+        self.total_amount = 1000
+        self.daily_amount = 10
+        self.whatsapp_chat_id = "chat"
 
 
 class FakeContractRepository:
@@ -57,11 +61,11 @@ class FakeContractRepository:
         self.contract = contract
         self.lookups = []
 
-    def get_by_whatsapp_chat_id(self, whatsapp_chat_id):
+    def get_active_by_whatsapp_chat_id(self, whatsapp_chat_id):
 
         self.lookups.append(whatsapp_chat_id)
 
-        return self.contract
+        return [self.contract] if self.contract is not None else []
 
 
 class FakeService:
@@ -78,6 +82,7 @@ class FakeService:
         message,
         conversation_id=None,
         conversation_history=None,
+        resolved_contracts=None,
     ):
 
         self.calls.append((contract_id, message_id, message))

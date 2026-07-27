@@ -32,6 +32,7 @@ from app.agents.confidence_checker import ConfidenceChecker
 
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
+from app.agents.contract_resolver_node import ContractResolverNode
 from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
@@ -86,6 +87,7 @@ def create_agent_execution_service(
     # Nodes.
     payment_detection_node = PaymentDetectionNode(payment_agent)
     confidence_checker_node = ConfidenceCheckerNode(confidence_checker)
+    contract_resolver_node = ContractResolverNode()
     approval_creation_node = ApprovalCreationNode(payment_service)
     payment_creation_node = PaymentCreationNode(payment_service)
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
@@ -106,6 +108,7 @@ def create_agent_execution_service(
     payment_workflow = PaymentWorkflow(
         payment_detection_node,
         confidence_checker_node,
+        contract_resolver_node,
         approval_creation_node,
         payment_creation_node,
         balance_update_node,

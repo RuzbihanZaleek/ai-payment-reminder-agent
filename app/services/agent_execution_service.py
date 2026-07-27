@@ -24,6 +24,7 @@ class AgentExecutionService:
         message: str,
         conversation_id: int | None = None,
         conversation_history: list | None = None,
+        resolved_contracts: list | None = None,
     ) -> AgentState:
 
         agent_run = AgentRun(
@@ -45,6 +46,7 @@ class AgentExecutionService:
             requires_approval=False,
             conversation_id=conversation_id,
             conversation_history=conversation_history or [],
+            resolved_contracts=resolved_contracts or [],
         )
 
         try:

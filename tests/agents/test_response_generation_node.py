@@ -4,6 +4,7 @@ from app.agents.notification_node import NotificationNode
 from app.agents.payment_workflow import PaymentWorkflow
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
+from app.agents.contract_resolver_node import ContractResolverNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.state import AgentState
 from app.services.notification_service import FakeNotificationService
@@ -187,6 +188,7 @@ def test_workflow_integration():
     workflow = PaymentWorkflow(
         PaymentDetectionNode(FakePaymentAgent()),
         ConfidenceCheckerNode(FakeConfidenceChecker()),
+        ContractResolverNode(),
         NoopApprovalNode(),
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),

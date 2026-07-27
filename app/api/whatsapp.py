@@ -48,6 +48,18 @@ def get_conversation_memory_service():
         db.close()
 
 
+def _contract_summary(contract) -> dict:
+    """Lightweight representation of a contract for the resolver node."""
+
+    return {
+        "id": contract.id,
+        "reference_code": contract.reference_code,
+        "total_amount": contract.total_amount,
+        "daily_amount": contract.daily_amount,
+        "whatsapp_chat_id": contract.whatsapp_chat_id,
+    }
+
+
 def _extract_message(payload: dict):
     """Pull (message_id, sender_phone, body) out of a Meta webhook payload.
 
@@ -120,11 +132,18 @@ def receive_webhook(
     if processed_message_repository.exists(message_id):
         return {"status": "duplicate"}
 
-    contract = contract_repository.get_by_whatsapp_chat_id(phone)
+    contracts = contract_repository.get_active_by_whatsapp_chat_id(phone)
 
-    # Unknown sender -> acknowledge so Meta stops retrying.
-    if contract is None:
+    # Unknown sender (no active contracts) -> acknowledge so Meta stops retrying.
+    if not contracts:
         return {"status": "unknown_contract"}
+
+    # Lightweight candidate pool for the ContractResolverNode to select from.
+    resolved_contracts = [_contract_summary(contract) for contract in contracts]
+
+    # A primary contract is recorded on the AgentRun; the resolver node refines
+    # which contract the payment actually applies to based on the message.
+    primary_contract_id = contracts[0].id
 
     # Conversation memory: load prior context (summary + recent messages)
     # before running the agent. The current message is only persisted on
@@ -134,11 +153,12 @@ def receive_webhook(
 
     try:
         result = service.execute(
-            contract_id=contract.id,
+            contract_id=primary_contract_id,
             message_id=message_id,
             message=body,
             conversation_id=conversation.id,
             conversation_history=history["messages"],
+            resolved_contracts=resolved_contracts,
         )
     except Exception:
         # Never surface a non-200 to Meta; just record it for diagnosis.

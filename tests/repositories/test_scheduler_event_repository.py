@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 
 from app.models.contract import Contract
@@ -15,6 +16,7 @@ def _seed_run_and_contract(db_session):
     # must exist first.
     contract = ContractRepository(db_session).create(
         Contract(
+            reference_code=f"INV-{uuid.uuid4().hex[:12]}",
             name="c",
             total_amount=1000,
             daily_amount=10,

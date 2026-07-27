@@ -32,6 +32,13 @@ class AgentState(BaseModel):
     contract_id: Optional[int] = None
     whatsapp_chat_id: Optional[str] = None
 
+    # Multi-contract support
+    # resolved_contracts: the sender's active contracts (candidate pool,
+    # lightweight dicts) resolved from the phone number.
+    # contract_ids: the specific contract(s) referenced in the message.
+    resolved_contracts: list = []
+    contract_ids: list[int] = []
+
 
     # Financial information
     total_amount: Optional[Decimal] = None

@@ -18,6 +18,7 @@ class ContractService:
     ) -> Contract:
 
         contract = Contract(
+            reference_code=contract_data.reference_code,
             name=contract_data.name,
             description=contract_data.description,
             total_amount=contract_data.total_amount,

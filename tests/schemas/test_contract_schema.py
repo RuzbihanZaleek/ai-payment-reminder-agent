@@ -8,6 +8,7 @@ from app.schemas.contract import ContractCreate
 
 def valid_contract_data():
     return {
+        "reference_code": "INV001",
         "name": "Friend Payment",
         "description": "Monthly repayment tracking",
         "total_amount": Decimal("2200"),

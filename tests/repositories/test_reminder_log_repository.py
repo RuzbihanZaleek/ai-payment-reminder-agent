@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 
 from app.models.contract import Contract
@@ -11,6 +12,7 @@ def _create_contract(db_session) -> Contract:
     # reminder_logs.contract_id is a FK -> contracts.id, so every log needs a
     # real parent contract to satisfy the constraint.
     contract = Contract(
+        reference_code=f"INV-{uuid.uuid4().hex[:12]}",
         name="c",
         total_amount=1000,
         daily_amount=10,

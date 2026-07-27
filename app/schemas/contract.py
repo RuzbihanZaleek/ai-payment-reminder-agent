@@ -12,6 +12,11 @@ class Currency(str, Enum):
 
 
 class ContractCreate(BaseModel):
+    reference_code: str = Field(
+        min_length=1,
+        max_length=50
+    )
+
     name: str = Field(
         min_length=3,
         max_length=100
@@ -83,6 +88,8 @@ class ContractUpdate(BaseModel):
 class ContractResponse(BaseModel):
 
     id: int
+
+    reference_code: str
 
     name: str
 

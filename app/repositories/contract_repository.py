@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models.contract import Contract
+from app.models.contract import Contract, ContractStatus
 
 
 class ContractRepository:
@@ -39,6 +39,23 @@ class ContractRepository:
 
         return (
             self.db.query(Contract)
+            .all()
+        )
+
+
+    def get_active_by_whatsapp_chat_id(
+        self,
+        whatsapp_chat_id: str
+    ) -> list[Contract]:
+
+        return (
+            self.db.query(Contract)
+            .filter(
+                Contract.whatsapp_chat_id == whatsapp_chat_id
+            )
+            .filter(
+                Contract.status == ContractStatus.ACTIVE
+            )
             .all()
         )
 
