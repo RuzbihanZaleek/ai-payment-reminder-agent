@@ -47,8 +47,9 @@ class FakeConversationMemoryService:
 
 class FakeContract:
 
-    def __init__(self, contract_id, reference_code="INV001"):
+    def __init__(self, contract_id, reference_code="INV001", user_id=1):
         self.id = contract_id
+        self.user_id = user_id
         self.reference_code = reference_code
         self.total_amount = 1000
         self.daily_amount = 10
@@ -272,3 +273,58 @@ def test_execution_exception_still_returns_200(overrides):
 
     assert response.status_code == 200
     assert len(service.calls) == 1
+
+
+# --- Tenant isolation (Phase 10.2) ------------------------------------------
+
+class FakeMultiContractRepository:
+    """Returns a fixed list of contracts for any phone lookup."""
+
+    def __init__(self, contracts):
+        self.contracts = contracts
+        self.lookups = []
+
+    def get_active_by_whatsapp_chat_id(self, whatsapp_chat_id):
+        self.lookups.append(whatsapp_chat_id)
+        return list(self.contracts)
+
+
+class CapturingService:
+    """Captures the resolved_contracts candidate pool handed to the workflow."""
+
+    def __init__(self):
+        self.resolved_contracts = None
+
+    def execute(
+        self,
+        contract_id,
+        message_id,
+        message,
+        conversation_id=None,
+        conversation_history=None,
+        resolved_contracts=None,
+    ):
+        self.resolved_contracts = resolved_contracts
+        return SimpleNamespace(generated_message=None)
+
+
+def test_phone_shared_across_users_scopes_to_owning_user(overrides):
+    # Same phone matches contracts owned by two different users. The webhook must
+    # derive the owning user from the first match and only expose that user's
+    # contracts to the workflow -- never mix tenants in one run.
+    owner_a = FakeContract(contract_id=1, reference_code="A1", user_id=1)
+    owner_a_second = FakeContract(contract_id=2, reference_code="A2", user_id=1)
+    owner_b = FakeContract(contract_id=3, reference_code="B1", user_id=2)
+
+    repo = FakeMultiContractRepository([owner_a, owner_a_second, owner_b])
+    service = CapturingService()
+
+    overrides(contract_repository=repo, service=service)
+
+    response = client.post("/webhook", json=_message_payload())
+
+    assert response.status_code == 200
+
+    resolved_ids = {c["id"] for c in service.resolved_contracts}
+    # User 1 owns the first match, so only their two contracts are candidates.
+    assert resolved_ids == {1, 2}

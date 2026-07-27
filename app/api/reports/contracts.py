@@ -98,7 +98,7 @@ def get_contract_summary(
     service: ContractReportingService = Depends(get_contract_reporting_service),
 ):
 
-    summary = service.get_contract_summary(contract_id)
+    summary = service.get_contract_summary(contract_id, contract.user_id)
 
     if summary is None:
         raise HTTPException(status_code=404, detail="Contract not found")

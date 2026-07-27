@@ -9,9 +9,9 @@ class AgentAnalyticsService:
     ):
         self.agent_reporting_service = agent_reporting_service
 
-    def get_agent_analytics(self) -> dict:
+    def get_agent_analytics(self, user_id: int) -> dict:
 
-        stats = self.agent_reporting_service.get_agent_stats()
+        stats = self.agent_reporting_service.get_agent_stats(user_id)
 
         total = stats["total_agent_runs"]
         completed = stats["completed_runs"]

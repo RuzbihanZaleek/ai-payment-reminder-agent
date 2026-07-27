@@ -49,6 +49,14 @@ class ContractService:
         return self.repository.get_all()
 
 
+    def get_user_contracts(
+        self,
+        user_id: int
+    ) -> list[Contract]:
+
+        return self.repository.get_all_for_user(user_id)
+
+
     def delete_contract(
         self,
         contract_id: int

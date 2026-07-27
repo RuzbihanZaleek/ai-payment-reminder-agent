@@ -19,31 +19,56 @@ class PaymentService:
     def get_all_payments( self ) -> list[Payment]:
         return self.repository.get_all()
 
-    def _pending_manual_review_payments( self ) -> list[Payment]:
-        # Payments that genuinely need a human decision: normal auto-processed
-        # payments default to PENDING approval_status but do not require review.
-        pending = self.repository.get_by_approval_status(ApprovalStatus.PENDING)
+    def get_user_payments( self, user_id: int ) -> list[Payment]:
+        return self.repository.get_all_for_user(user_id)
 
-        return [payment for payment in pending if payment.requires_manual_review]
+    # --- Single-source business rules (applied to any payment list) ---------
+
+    @staticmethod
+    def _approved( payments: list[Payment] ) -> list[Payment]:
+        # Confirmed money: APPROVED approval_status only.
+        return [p for p in payments if p.approval_status == ApprovalStatus.APPROVED]
+
+    @staticmethod
+    def _pending_reviews( payments: list[Payment] ) -> list[Payment]:
+        # Genuinely awaiting a human decision.
+        return [
+            p for p in payments
+            if p.requires_manual_review
+            and p.approval_status == ApprovalStatus.PENDING
+        ]
+
+    @staticmethod
+    def _sum( payments: list[Payment] ) -> Decimal:
+        return sum( ( p.amount for p in payments ), Decimal("0") )
+
+    # --- Global stats -------------------------------------------------------
 
     def count_pending_approvals( self ) -> int:
-        return len(self._pending_manual_review_payments())
+        return len(self._pending_reviews(
+            self.repository.get_by_approval_status(ApprovalStatus.PENDING)
+        ))
 
     def calculate_pending_review_amount( self ) -> Decimal:
-        return sum(
-            ( payment.amount for payment in self._pending_manual_review_payments() ),
-            Decimal("0"),
-        )
+        return self._sum(self._pending_reviews(
+            self.repository.get_by_approval_status(ApprovalStatus.PENDING)
+        ))
 
     def calculate_total_received( self ) -> Decimal:
-        # Confirmed money only: payments a human (or the approval flow) marked
-        # APPROVED. Pending / rejected payments are not counted as received.
-        approved = self.repository.get_by_approval_status(ApprovalStatus.APPROVED)
-
-        return sum(
-            ( payment.amount for payment in approved ),
-            Decimal("0"),
+        return self._sum(
+            self.repository.get_by_approval_status(ApprovalStatus.APPROVED)
         )
+
+    # --- User-scoped stats (tenant isolation) -------------------------------
+
+    def count_pending_reviews_for_user( self, user_id: int ) -> int:
+        return len(self._pending_reviews(self.get_user_payments(user_id)))
+
+    def calculate_pending_review_amount_for_user( self, user_id: int ) -> Decimal:
+        return self._sum(self._pending_reviews(self.get_user_payments(user_id)))
+
+    def calculate_total_received_for_user( self, user_id: int ) -> Decimal:
+        return self._sum(self._approved(self.get_user_payments(user_id)))
     
     def get_contract_payments( self, contract_id: int ) -> list[Payment]:
         return self.repository.get_by_contract_id(contract_id)

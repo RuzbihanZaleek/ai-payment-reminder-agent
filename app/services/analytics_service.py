@@ -23,11 +23,12 @@ class AnalyticsService:
         self.reminder_analytics_service = reminder_analytics_service
         self.agent_analytics_service = agent_analytics_service
 
-    def get_overview(self) -> dict:
+    def get_overview(self, user_id: int) -> dict:
 
         return {
-            "contracts": self.contract_analytics_service.get_contract_analytics(),
-            "payments": self.payment_analytics_service.get_payment_analytics(),
+            "contracts": self.contract_analytics_service.get_contract_analytics(user_id),
+            "payments": self.payment_analytics_service.get_payment_analytics(user_id),
+            # Reminders/scheduler are system-level infrastructure and stay global.
             "reminders": self.reminder_analytics_service.get_reminder_analytics(),
-            "agents": self.agent_analytics_service.get_agent_analytics(),
+            "agents": self.agent_analytics_service.get_agent_analytics(user_id),
         }

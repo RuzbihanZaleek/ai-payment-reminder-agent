@@ -26,7 +26,7 @@ class FakeDashboardService:
         self.overview = overview
         self.exc = exc
 
-    def get_overview(self):
+    def get_overview(self, user_id):
 
         if self.exc is not None:
             raise self.exc

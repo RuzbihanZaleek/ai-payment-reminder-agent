@@ -9,12 +9,12 @@ from app.enums.agent_event_status import AgentEventStatus
 from app.container import create_agent_reporting_service
 from app.services.agent_reporting_service import AgentReportingService
 from app.api.deps import get_current_user
+from app.models.user import User
 
 
 router = APIRouter(
     prefix="/reports/agent-runs",
     tags=["reports"],
-    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -62,19 +62,21 @@ def get_agent_reporting_service():
 
 @router.get("", response_model=list[AgentRunResponse])
 def list_agent_runs(
+    current_user: User = Depends(get_current_user),
     service: AgentReportingService = Depends(get_agent_reporting_service),
 ):
 
-    return service.get_recent_runs()
+    return service.get_recent_runs(current_user.id)
 
 
 @router.get("/{run_id}", response_model=AgentRunDetailResponse)
 def get_agent_run(
     run_id: int,
+    current_user: User = Depends(get_current_user),
     service: AgentReportingService = Depends(get_agent_reporting_service),
 ):
 
-    details = service.get_run_details(run_id)
+    details = service.get_run_details(run_id, current_user.id)
 
     if details is None:
         raise HTTPException(status_code=404, detail="Agent run not found")

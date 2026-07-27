@@ -14,13 +14,13 @@ class AgentReportingService:
         self.agent_run_repository = agent_run_repository
         self.agent_event_repository = agent_event_repository
 
-    def get_recent_runs(self, limit: int = 20) -> list[AgentRun]:
+    def get_recent_runs(self, user_id: int, limit: int = 20) -> list[AgentRun]:
 
-        return self.agent_run_repository.get_recent(limit)
+        return self.agent_run_repository.get_recent_for_user(user_id, limit)
 
-    def get_run_details(self, run_id: int) -> dict | None:
+    def get_run_details(self, run_id: int, user_id: int) -> dict | None:
 
-        run = self.agent_run_repository.get_by_id(run_id)
+        run = self.agent_run_repository.get_by_id_for_user(run_id, user_id)
 
         if run is None:
             return None
@@ -30,9 +30,9 @@ class AgentReportingService:
             "events": self.agent_event_repository.get_by_run_id(run_id),
         }
 
-    def get_agent_stats(self) -> dict:
+    def get_agent_stats(self, user_id: int) -> dict:
 
-        runs = self.agent_run_repository.get_all()
+        runs = self.agent_run_repository.get_all_for_user(user_id)
 
         return {
             "total_agent_runs": len(runs),

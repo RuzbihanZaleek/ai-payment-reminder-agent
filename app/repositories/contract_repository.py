@@ -61,6 +61,17 @@ class ContractRepository:
         )
 
 
+    def get_all_for_user(self, user_id: int) -> list[Contract]:
+
+        return (
+            self.db.query(Contract)
+            .filter(
+                Contract.user_id == user_id
+            )
+            .all()
+        )
+
+
     def get_active_by_whatsapp_chat_id(
         self,
         whatsapp_chat_id: str

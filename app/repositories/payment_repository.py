@@ -21,6 +21,16 @@ class PaymentRepository:
             .all()
         )
 
+    def get_all_for_user( self, user_id: int ) -> list[Payment]:
+        from app.models.contract import Contract
+
+        return (
+            self.db.query(Payment)
+            .join(Contract, Payment.contract_id == Contract.id)
+            .filter(Contract.user_id == user_id)
+            .all()
+        )
+
     def get_by_id( self, payment_id: int) -> Payment | None:
         return (
             self.db.query(Payment)

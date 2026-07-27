@@ -11,9 +11,9 @@ class PaymentAnalyticsService:
     ):
         self.payment_reporting_service = payment_reporting_service
 
-    def get_payment_analytics(self) -> dict:
+    def get_payment_analytics(self, user_id: int) -> dict:
 
-        stats = self.payment_reporting_service.get_payment_stats()
+        stats = self.payment_reporting_service.get_payment_stats(user_id)
 
         count = stats["payment_transaction_count"]
         received = stats["total_amount_received"]

@@ -9,7 +9,10 @@ from app.services.analytics_service import AnalyticsService
 
 class _Reporting:
     def __init__(self, method_name, value):
-        setattr(self, method_name, lambda: value)
+        # Accept optional user_id (and any other args) so both the user-scoped
+        # (get_contract_stats/get_payment_stats/get_agent_stats) and the global
+        # (get_reminder_stats/get_scheduler_stats) fakes share one shape.
+        setattr(self, method_name, lambda *args: value)
 
 
 # --- Contract analytics -----------------------------------------------------
@@ -24,7 +27,7 @@ def test_contract_analytics_derives_collected_and_rate():
         "total_remaining_amount": Decimal("400"),
     })
 
-    result = ContractAnalyticsService(reporting).get_contract_analytics()
+    result = ContractAnalyticsService(reporting).get_contract_analytics(7)
 
     assert result["total_contract_value"] == Decimal("1000")
     assert result["total_outstanding_amount"] == Decimal("400")
@@ -39,7 +42,7 @@ def test_contract_analytics_zero_value_rate_is_zero():
         "total_remaining_amount": Decimal("0"),
     })
 
-    result = ContractAnalyticsService(reporting).get_contract_analytics()
+    result = ContractAnalyticsService(reporting).get_contract_analytics(7)
 
     assert result["collection_rate"] == 0.0
 
@@ -55,7 +58,7 @@ def test_payment_analytics_average():
         "pending_review_amount": Decimal("25"),
     })
 
-    result = PaymentAnalyticsService(reporting).get_payment_analytics()
+    result = PaymentAnalyticsService(reporting).get_payment_analytics(7)
 
     assert result["total_amount_received"] == Decimal("200")
     assert result["payment_transaction_count"] == 4
@@ -71,7 +74,7 @@ def test_payment_analytics_zero_transactions():
         "pending_review_amount": Decimal("0"),
     })
 
-    result = PaymentAnalyticsService(reporting).get_payment_analytics()
+    result = PaymentAnalyticsService(reporting).get_payment_analytics(7)
 
     assert result["average_payment_amount"] == Decimal("0")
 
@@ -86,7 +89,7 @@ def test_agent_analytics_success_rate():
         "failed_runs": 2,
     })
 
-    result = AgentAnalyticsService(reporting).get_agent_analytics()
+    result = AgentAnalyticsService(reporting).get_agent_analytics(7)
 
     assert result["success_rate"] == 0.8
     assert result["failed_runs"] == 2
@@ -133,7 +136,9 @@ def test_reminder_analytics_no_attempts():
 
 class _Analytics:
     def __init__(self, method_name, value):
-        setattr(self, method_name, lambda: value)
+        # Accept optional user_id so both user-scoped (contract/payment/agent)
+        # and global (reminder) analytics fakes share one shape.
+        setattr(self, method_name, lambda *args: value)
 
 
 def test_analytics_service_composes_sections():
@@ -145,7 +150,7 @@ def test_analytics_service_composes_sections():
         _Analytics("get_agent_analytics", {"total_agent_runs": 10}),
     )
 
-    overview = service.get_overview()
+    overview = service.get_overview(7)
 
     assert overview["contracts"]["total_contract_value"] == Decimal("1000")
     assert overview["payments"]["payment_transaction_count"] == 4

@@ -9,9 +9,9 @@ class ContractAnalyticsService:
     ):
         self.contract_reporting_service = contract_reporting_service
 
-    def get_contract_analytics(self) -> dict:
+    def get_contract_analytics(self, user_id: int) -> dict:
 
-        stats = self.contract_reporting_service.get_contract_stats()
+        stats = self.contract_reporting_service.get_contract_stats(user_id)
 
         total_value = stats["total_contract_value"]
         outstanding = stats["total_remaining_amount"]

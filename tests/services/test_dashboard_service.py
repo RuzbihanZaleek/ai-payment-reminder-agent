@@ -8,7 +8,7 @@ class FakeContractReporting:
     def __init__(self, stats):
         self.stats = stats
 
-    def get_contract_stats(self):
+    def get_contract_stats(self, user_id):
         return self.stats
 
 
@@ -17,7 +17,7 @@ class FakePaymentReporting:
     def __init__(self, stats):
         self.stats = stats
 
-    def get_payment_stats(self):
+    def get_payment_stats(self, user_id):
         return self.stats
 
 
@@ -26,7 +26,7 @@ class FakeAgentReporting:
     def __init__(self, stats):
         self.stats = stats
 
-    def get_agent_stats(self):
+    def get_agent_stats(self, user_id):
         return self.stats
 
 
@@ -73,7 +73,7 @@ def test_aggregates_all_sections():
         },
     )
 
-    overview = service.get_overview()
+    overview = service.get_overview(7)
 
     assert overview["contracts"]["total_contracts"] == 5
     assert overview["contracts"]["total_remaining_amount"] == Decimal("1500")
@@ -112,7 +112,7 @@ def test_empty_data():
         },
     )
 
-    overview = service.get_overview()
+    overview = service.get_overview(7)
 
     assert overview["contracts"]["total_contracts"] == 0
     assert overview["payments"]["payment_transaction_count"] == 0

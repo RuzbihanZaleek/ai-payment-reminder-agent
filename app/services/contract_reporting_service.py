@@ -15,11 +15,12 @@ class ContractReportingService:
         self.contract_service = contract_service
         self.payment_service = payment_service
 
-    def get_contract_summary(self, contract_id: int) -> dict | None:
+    def get_contract_summary(self, contract_id: int, user_id: int) -> dict | None:
 
         contract = self.contract_service.get_contract(contract_id)
 
-        if contract is None:
+        # Tenant isolation: a contract only exists for its owner.
+        if contract is None or contract.user_id != user_id:
             return None
 
         payments = self.payment_service.get_contract_payments(contract_id)
@@ -37,9 +38,9 @@ class ContractReportingService:
             "payment_count": len(payments),
         }
 
-    def get_contract_stats(self) -> dict:
+    def get_contract_stats(self, user_id: int) -> dict:
 
-        contracts = self.contract_service.get_all_contracts()
+        contracts = self.contract_service.get_user_contracts(user_id)
 
         total_remaining_amount = sum(
             (

@@ -9,8 +9,9 @@ from app.services.scheduler_reporting_service import SchedulerReportingService
 
 class FakeContract:
 
-    def __init__(self):
+    def __init__(self, user_id=7):
         self.id = 1
+        self.user_id = user_id
         self.reference_code = "INV001"
         self.name = "Friend Payment"
         self.total_amount = Decimal("1000")
@@ -18,12 +19,17 @@ class FakeContract:
 
 class FakeContractService:
 
-    def __init__(self, contract):
+    def __init__(self, contract, contracts=None):
         self.contract = contract
+        self.contracts = contracts or ([] if contract is None else [contract])
 
     def get_contract(self, contract_id):
 
         return self.contract
+
+    def get_user_contracts(self, user_id):
+
+        return self.contracts
 
 
 class FakePaymentService:
@@ -54,7 +60,7 @@ def test_contract_summary():
         ),
     )
 
-    summary = service.get_contract_summary(1)
+    summary = service.get_contract_summary(1, 7)
 
     assert summary["contract_id"] == 1
     assert summary["reference_code"] == "INV001"
@@ -70,7 +76,17 @@ def test_contract_summary_missing_returns_none():
         FakePaymentService(payments=[]),
     )
 
-    assert service.get_contract_summary(999) is None
+    assert service.get_contract_summary(999, 7) is None
+
+
+def test_contract_summary_other_user_returns_none():
+    # Tenant isolation: contract owned by user 7, requested by user 99.
+    service = ContractReportingService(
+        FakeContractService(FakeContract(user_id=7)),
+        FakePaymentService(payments=[]),
+    )
+
+    assert service.get_contract_summary(1, 99) is None
 
 
 def test_payment_history():
@@ -110,6 +126,15 @@ class FakeAgentRunRepository:
     def get_by_id(self, run_id):
         return self.run
 
+    def get_recent_for_user(self, user_id, limit):
+        return self.recent
+
+    def get_by_id_for_user(self, run_id, user_id):
+        return self.run
+
+    def get_all_for_user(self, user_id):
+        return self.recent
+
 
 class FakeAgentEventRepository:
 
@@ -130,7 +155,7 @@ def test_agent_run_details():
         FakeAgentEventRepository(events),
     )
 
-    details = service.get_run_details(5)
+    details = service.get_run_details(5, 7)
 
     assert details["run"] is run
     assert details["events"] == events
@@ -143,7 +168,7 @@ def test_agent_run_details_missing_returns_none():
         FakeAgentEventRepository([]),
     )
 
-    assert service.get_run_details(999) is None
+    assert service.get_run_details(999, 7) is None
 
 
 class FakeSchedulerRunRepository:
@@ -207,16 +232,16 @@ class FakePaymentServiceStats:
         self.pending_count = pending_count
         self.pending_amount = pending_amount
 
-    def get_all_payments(self):
+    def get_user_payments(self, user_id):
         return self.payments
 
-    def calculate_total_received(self):
+    def calculate_total_received_for_user(self, user_id):
         return self.total_received
 
-    def count_pending_approvals(self):
+    def count_pending_reviews_for_user(self, user_id):
         return self.pending_count
 
-    def calculate_pending_review_amount(self):
+    def calculate_pending_review_amount_for_user(self, user_id):
         return self.pending_amount
 
 
@@ -231,7 +256,7 @@ def test_payment_stats_transaction_count_and_confirmed_total():
         )
     )
 
-    stats = service.get_payment_stats()
+    stats = service.get_payment_stats(7)
 
     assert stats["payment_transaction_count"] == 3
     # Confirmed money only, not the sum of all transactions.

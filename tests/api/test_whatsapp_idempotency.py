@@ -15,8 +15,9 @@ client = TestClient(app)
 
 class FakeContract:
 
-    def __init__(self, contract_id=7):
+    def __init__(self, contract_id=7, user_id=1):
         self.id = contract_id
+        self.user_id = user_id
         self.reference_code = "INV001"
         self.total_amount = 1000
         self.daily_amount = 10

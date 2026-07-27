@@ -138,6 +138,12 @@ def receive_webhook(
     if not contracts:
         return {"status": "unknown_contract"}
 
+    # Tenant isolation: a phone number could match contracts owned by different
+    # users. Resolve the owning user from the first matching contract, then scope
+    # the candidate pool to that user so a single run never mixes tenants.
+    owner_user_id = contracts[0].user_id
+    contracts = [c for c in contracts if c.user_id == owner_user_id]
+
     # Lightweight candidate pool for the ContractResolverNode to select from.
     resolved_contracts = [_contract_summary(contract) for contract in contracts]
 
