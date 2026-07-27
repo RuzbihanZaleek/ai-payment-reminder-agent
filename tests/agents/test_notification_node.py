@@ -158,7 +158,7 @@ def test_payment_notification_creates_no_log():
 
 class FakePaymentAgent:
 
-    def analyze_message(self, message):
+    def analyze_message(self, message, history=None):
 
         from app.schemas.payment_detection import (
             PaymentDetectionResult,

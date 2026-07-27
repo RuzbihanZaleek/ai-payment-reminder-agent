@@ -6,6 +6,8 @@ from app.models.reminder_log import ReminderLog
 from app.models.processed_message import ProcessedMessage
 from app.models.scheduler_run import SchedulerRun
 from app.models.scheduler_event import SchedulerEvent
+from app.models.conversation import Conversation
+from app.models.conversation_message import ConversationMessage
 
 __all__ = [
     "Contract",
@@ -16,4 +18,6 @@ __all__ = [
     "ProcessedMessage",
     "SchedulerRun",
     "SchedulerEvent",
+    "Conversation",
+    "ConversationMessage",
 ]

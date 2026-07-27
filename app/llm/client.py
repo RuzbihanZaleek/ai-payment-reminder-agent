@@ -1,6 +1,7 @@
 import time
 
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
@@ -19,13 +20,29 @@ class OpenAIClient:
         self.prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", PAYMENT_EXTRACTION_SYSTEM_PROMPT),
+                MessagesPlaceholder("history", optional=True),
                 ("human", "{message}")
             ]
         )
-        
+
         self.chain = (self.prompt | self.llm.with_structured_output(PaymentDetectionResult))
-        
-    def invoke(self, message: str) -> PaymentDetectionResult:
+
+    @staticmethod
+    def _to_langchain_history(history):
+        messages = []
+
+        for item in history or []:
+            role = item.get("role")
+            content = item.get("content", "")
+
+            if role == "ASSISTANT":
+                messages.append(AIMessage(content=content))
+            else:
+                messages.append(HumanMessage(content=content))
+
+        return messages
+
+    def invoke(self, message: str, history: list | None = None) -> PaymentDetectionResult:
 
         logger.info(
             "openai_request_started",
@@ -36,7 +53,8 @@ class OpenAIClient:
 
         try:
             result = self.chain.invoke({
-                "message": message
+                "message": message,
+                "history": self._to_langchain_history(history),
             })
         except Exception as exc:
             logger.error(

@@ -11,7 +11,7 @@ from app.enums.payment_detection import (
 
 class FakeLLM:
 
-    def invoke(self, message):
+    def invoke(self, message, history=None):
 
         return {
             "intent": "PAYMENT_RECEIVED",

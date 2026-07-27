@@ -6,6 +6,7 @@ from app.api.agent import get_agent_execution_service
 from app.api.whatsapp import (
     get_contract_repository,
     get_processed_message_repository,
+    get_conversation_memory_service,
 )
 
 
@@ -25,13 +26,43 @@ class FakeContractRepository:
         return FakeContract()
 
 
+class FakeConversation:
+
+    def __init__(self, conversation_id=1):
+        self.id = conversation_id
+
+
+class FakeConversationMemoryService:
+
+    def get_or_create_conversation(self, whatsapp_chat_id):
+
+        return FakeConversation()
+
+    def store_user_message(self, conversation_id, content):
+        pass
+
+    def get_recent_history(self, conversation_id, limit=10):
+
+        return []
+
+    def store_assistant_message(self, conversation_id, content):
+        pass
+
+
 class FakeService:
 
     def __init__(self, exc=None):
         self.exc = exc
         self.calls = []
 
-    def execute(self, contract_id, message_id, message):
+    def execute(
+        self,
+        contract_id,
+        message_id,
+        message,
+        conversation_id=None,
+        conversation_history=None,
+    ):
 
         self.calls.append((contract_id, message_id, message))
 
@@ -58,6 +89,9 @@ def _install(contract_repo, processed_repo, service):
 
     app.dependency_overrides[get_contract_repository] = lambda: contract_repo
     app.dependency_overrides[get_processed_message_repository] = lambda: processed_repo
+    app.dependency_overrides[get_conversation_memory_service] = (
+        lambda: FakeConversationMemoryService()
+    )
     app.dependency_overrides[get_agent_execution_service] = lambda: service
 
 

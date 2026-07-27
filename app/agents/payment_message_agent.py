@@ -9,10 +9,11 @@ class PaymentMessageAgent:
         self.llm = llm
 
 
-    def analyze_message( self, message: str ) -> PaymentDetectionResult:
+    def analyze_message( self, message: str, history: list | None = None ) -> PaymentDetectionResult:
 
         response = self.llm.invoke(
-            message
+            message,
+            history,
         )
 
         return PaymentDetectionResult.model_validate(

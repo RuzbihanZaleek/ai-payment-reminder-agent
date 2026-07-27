@@ -1,16 +1,48 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from types import SimpleNamespace
+
 from app.main import app
 from app.core.config import settings
 from app.api.agent import get_agent_execution_service
 from app.api.whatsapp import (
     get_contract_repository,
     get_processed_message_repository,
+    get_conversation_memory_service,
 )
 
 
 client = TestClient(app)
+
+
+class FakeConversation:
+
+    def __init__(self, conversation_id=1):
+        self.id = conversation_id
+
+
+class FakeConversationMemoryService:
+
+    def __init__(self):
+        self.user_messages = []
+        self.assistant_messages = []
+
+    def get_or_create_conversation(self, whatsapp_chat_id):
+
+        return FakeConversation()
+
+    def store_user_message(self, conversation_id, content):
+
+        self.user_messages.append((conversation_id, content))
+
+    def get_recent_history(self, conversation_id, limit=10):
+
+        return []
+
+    def store_assistant_message(self, conversation_id, content):
+
+        self.assistant_messages.append((conversation_id, content))
 
 
 class FakeContract:
@@ -34,18 +66,26 @@ class FakeContractRepository:
 
 class FakeService:
 
-    def __init__(self, exc=None):
+    def __init__(self, exc=None, generated_message=None):
         self.exc = exc
+        self.generated_message = generated_message
         self.calls = []
 
-    def execute(self, contract_id, message_id, message):
+    def execute(
+        self,
+        contract_id,
+        message_id,
+        message,
+        conversation_id=None,
+        conversation_history=None,
+    ):
 
         self.calls.append((contract_id, message_id, message))
 
         if self.exc is not None:
             raise self.exc
 
-        return None
+        return SimpleNamespace(generated_message=self.generated_message)
 
 
 class FakeProcessedMessageRepository:
@@ -108,6 +148,11 @@ def overrides():
         processed_repository = processed_repository or FakeProcessedMessageRepository()
         app.dependency_overrides[get_processed_message_repository] = (
             lambda: processed_repository
+        )
+
+        # Conversation memory is not the focus of these tests -> use a stub.
+        app.dependency_overrides[get_conversation_memory_service] = (
+            lambda: FakeConversationMemoryService()
         )
 
     yield _install

@@ -16,7 +16,8 @@ class PaymentDetectionNode:
     ) -> AgentState:
 
         state.payment_detection = self.payment_agent.analyze_message(
-            state.message
+            state.message,
+            state.conversation_history,
         )
 
         return state

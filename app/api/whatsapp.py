@@ -5,9 +5,11 @@ from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.container import create_conversation_memory_service
 from app.repositories.contract_repository import ContractRepository
 from app.repositories.processed_message_repository import ProcessedMessageRepository
 from app.services.agent_execution_service import AgentExecutionService
+from app.services.conversation_memory_service import ConversationMemoryService
 from app.api.agent import get_agent_execution_service
 
 
@@ -32,6 +34,16 @@ def get_processed_message_repository():
 
     try:
         yield ProcessedMessageRepository(db)
+    finally:
+        db.close()
+
+
+def get_conversation_memory_service():
+
+    db = SessionLocal()
+
+    try:
+        yield create_conversation_memory_service(db=db)
     finally:
         db.close()
 
@@ -89,6 +101,9 @@ def receive_webhook(
     processed_message_repository: ProcessedMessageRepository = Depends(
         get_processed_message_repository
     ),
+    conversation_memory_service: ConversationMemoryService = Depends(
+        get_conversation_memory_service
+    ),
     service: AgentExecutionService = Depends(get_agent_execution_service),
 ):
 
@@ -111,11 +126,19 @@ def receive_webhook(
     if contract is None:
         return {"status": "unknown_contract"}
 
+    # Conversation memory: record the incoming message and load prior context
+    # before running the agent.
+    conversation = conversation_memory_service.get_or_create_conversation(phone)
+    conversation_memory_service.store_user_message(conversation.id, body)
+    history = conversation_memory_service.get_recent_history(conversation.id)
+
     try:
-        service.execute(
+        result = service.execute(
             contract_id=contract.id,
             message_id=message_id,
             message=body,
+            conversation_id=conversation.id,
+            conversation_history=history,
         )
     except Exception:
         # Never surface a non-200 to Meta; just record it for diagnosis.
@@ -125,6 +148,13 @@ def receive_webhook(
             message_id,
         )
         return {"status": "error"}
+
+    # Persist the assistant's reply so it becomes part of the conversation.
+    if result is not None and result.generated_message is not None:
+        conversation_memory_service.store_assistant_message(
+            conversation.id,
+            result.generated_message,
+        )
 
     # Only mark processed after a successful run.
     processed_message_repository.create(

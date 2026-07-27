@@ -7,6 +7,10 @@ from app.repositories.contract_repository import ContractRepository
 from app.repositories.reminder_log_repository import ReminderLogRepository
 from app.repositories.scheduler_run_repository import SchedulerRunRepository
 from app.repositories.scheduler_event_repository import SchedulerEventRepository
+from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.conversation_message_repository import (
+    ConversationMessageRepository,
+)
 
 from app.core.config import settings
 
@@ -18,6 +22,7 @@ from app.services.agent_execution_service import AgentExecutionService
 from app.services.reminder_service import ReminderService
 from app.services.reminder_policy_service import ReminderPolicyService
 from app.services.reminder_execution_service import ReminderExecutionService
+from app.services.conversation_memory_service import ConversationMemoryService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -238,3 +243,20 @@ def create_scheduler_event_repository(
         db = SessionLocal()
 
     return SchedulerEventRepository(db)
+
+
+def create_conversation_memory_service(
+    db=None,
+) -> ConversationMemoryService:
+    """Compose the conversation memory service used by the WhatsApp webhook."""
+
+    if db is None:
+        db = SessionLocal()
+
+    conversation_repository = ConversationRepository(db)
+    conversation_message_repository = ConversationMessageRepository(db)
+
+    return ConversationMemoryService(
+        conversation_repository,
+        conversation_message_repository,
+    )

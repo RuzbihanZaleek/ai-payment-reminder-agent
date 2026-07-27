@@ -18,6 +18,10 @@ class AgentState(BaseModel):
     message: str
     message_id: Optional[str] = None
 
+    # Conversation memory
+    conversation_id: Optional[int] = None
+    conversation_history: list = []
+
     # AI detection result
     # The detected amount lives on payment_detection.amount — read it there
     # rather than duplicating it onto the state.

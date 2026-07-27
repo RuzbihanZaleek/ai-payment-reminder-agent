@@ -22,6 +22,8 @@ class AgentExecutionService:
         contract_id: int,
         message_id: str,
         message: str,
+        conversation_id: int | None = None,
+        conversation_history: list | None = None,
     ) -> AgentState:
 
         agent_run = AgentRun(
@@ -41,6 +43,8 @@ class AgentExecutionService:
             contract_id=contract_id,
             pending_dates=[],
             requires_approval=False,
+            conversation_id=conversation_id,
+            conversation_history=conversation_history or [],
         )
 
         try:

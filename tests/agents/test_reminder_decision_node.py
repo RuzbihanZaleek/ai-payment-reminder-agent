@@ -88,7 +88,7 @@ def test_send_reminder():
 
 class FakePaymentAgent:
 
-    def analyze_message(self, message):
+    def analyze_message(self, message, history=None):
 
         return make_detection()
 
