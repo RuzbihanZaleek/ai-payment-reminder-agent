@@ -391,6 +391,8 @@ See [`.env.example`](.env.example). Summary:
 | `NOTIFICATION_MAX_RETRIES` | no | `3` | attempts before a notification is FAILED |
 | `NOTIFICATION_WORKER_BATCH_SIZE` | no | `50` | notifications per worker pass |
 | `NOTIFICATION_WORKER_LOCK_ID` | no | `902025106` | PG advisory-lock key (one worker runs) |
+| `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES` | no | `15` | stuck-PROCESSING recovery threshold |
+| `NOTIFICATION_FAILURE_ALERT_THRESHOLD` | no | `10` | failures per pass before an alert fires |
 | `RATE_LIMIT_ENABLED` | no | `true` | |
 | `RATE_LIMIT_LOGIN_PER_MINUTE` | no | `5` | per IP |
 | `RATE_LIMIT_REGISTER_PER_MINUTE` | no | `5` | per IP |
@@ -445,6 +447,53 @@ without touching routers. It is disabled under `APP_ENV=testing`.
 - **Audit trail** — security/business actions (login success/failure, payment
   approve/reject, contract creation) are written to `audit_logs` via
   `AuditService`. Secrets are never stored.
+
+### Operations & recovery
+
+- **Stuck-message recovery** — the worker, on each run, returns any message
+  stuck in `PROCESSING` beyond `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES` (a
+  crashed worker) to `PENDING` and re-queues it (logged `notification_outbox_recovered`).
+- **Dead-letter handling** — `FAILED` messages don't retry automatically; an
+  operator retries or discards them via the admin API.
+- **Admin API** (requires `is_admin`): `GET /admin/notifications/failed`,
+  `GET /admin/notifications/pending`, `POST /admin/notifications/{id}/retry`
+  (→ `PENDING`, attempts reset), `POST /admin/notifications/{id}/discard`
+  (→ `DISCARDED`). Also under `/api/v1/admin/...`.
+- **System dashboard** — `GET /dashboard/system` (admin only): queue size,
+  failed count, oldest-pending age, last scheduler run, scheduler failure count.
+- **Alerting** — `AlertService` (default `LoggingAlertService` emits
+  `alert_warning`/`alert_error`) fires on the notification-failure threshold,
+  scheduler-run failure, and database-readiness failure. Swap the implementation
+  to route to PagerDuty/Slack/etc.
+- **Metrics** — additionally `notification_queue_size` (gauge),
+  `notification_processing_duration_seconds` (summary),
+  `stuck_notification_recovered_total`.
+
+### Operational runbook
+
+- **A notification is stuck / not delivered**
+  1. `GET /dashboard/system` → check `notification_queue_size` and
+     `failed_notification_count`.
+  2. If it sits in `PENDING`, confirm the worker is running (logs
+     `notification_worker_started` on its interval) and not skipped
+     (`notification_worker_skipped_locked` means another replica holds the lock).
+  3. If `PROCESSING` and the worker crashed, it self-heals on the next run after
+     `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES`.
+- **Recover failed notifications**
+  1. `GET /admin/notifications/failed` to inspect (`last_error`, `attempt_count`).
+  2. Fix the root cause (e.g. WhatsApp credentials), then
+     `POST /admin/notifications/{id}/retry` — the message returns to `PENDING`
+     with attempts reset and is delivered on the next worker pass.
+  3. If it should never be delivered, `POST /admin/notifications/{id}/discard`.
+- **Stuck-worker recovery** — no action needed; the worker recovers stuck
+  `PROCESSING` rows automatically. To force it, restart the app (the worker runs
+  on its interval) or lower `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES`.
+- **Monitoring** — scrape `/metrics`; alert on rising
+  `notification_outbox_failed_total`, a growing `notification_queue_size`, or any
+  `alert_error` log event.
+- **Granting admin** — set `users.is_admin = true` for the operator's account
+  (e.g. `UPDATE users SET is_admin = true WHERE email = '...';`); there is no
+  self-service admin signup.
 
 ---
 

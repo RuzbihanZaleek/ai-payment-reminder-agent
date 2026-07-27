@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db.session import SessionLocal
 from app.core.security import decode_access_token
-from app.core.errors import UnauthorizedError, NotFoundError, ErrorCode
+from app.core.errors import UnauthorizedError, NotFoundError, ForbiddenError, ErrorCode
 from app.core.logger import get_logger
 from app.container import create_auth_service
 from app.models.user import User
@@ -47,6 +47,18 @@ def get_current_user(
         raise UnauthorizedError("User not found.")
 
     return user
+
+
+def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Ensure the authenticated user is an admin, or raise 403."""
+
+    if not getattr(current_user, "is_admin", False):
+        logger.info("admin_access_denied", extra={"user_id": current_user.id})
+        raise ForbiddenError("Admin privileges required.")
+
+    return current_user
 
 
 def require_owned_contract(

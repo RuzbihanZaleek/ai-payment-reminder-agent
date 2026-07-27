@@ -13,6 +13,9 @@ from app.core.metrics import (
     record_notification_processed,
     record_notification_failed,
     record_notification_retry,
+    record_stuck_notification_recovered,
+    set_notification_queue_size,
+    observe_notification_processing_duration,
 )
 from app.api.health import router as health_router
 
@@ -37,10 +40,19 @@ def test_summary_tracks_sum_and_count():
     assert snap["summary_count"]["dur_seconds"] == 2
 
 
+def test_gauge_set_and_overwritten():
+    registry = MetricsRegistry()
+    registry.set_gauge("queue_size", 5)
+    registry.set_gauge("queue_size", 3)  # gauges overwrite, not accumulate
+
+    assert registry.snapshot()["gauges"]["queue_size"] == 3
+
+
 def test_render_prometheus_format():
     registry = MetricsRegistry()
     registry.inc("requests_total", help="Total requests")
     registry.observe("latency_seconds", 0.25, help="Latency")
+    registry.set_gauge("queue_size", 7, help="Queue depth")
 
     text = registry.render()
 
@@ -49,6 +61,8 @@ def test_render_prometheus_format():
     assert "# TYPE latency_seconds summary" in text
     assert "latency_seconds_sum 0.25" in text
     assert "latency_seconds_count 1" in text
+    assert "# TYPE queue_size gauge" in text
+    assert "queue_size 7" in text
 
 
 def test_domain_recorders_increment_global_registry():
@@ -64,6 +78,9 @@ def test_domain_recorders_increment_global_registry():
     record_notification_failed()
     record_notification_retry()
     record_notification_retry()
+    record_stuck_notification_recovered(2)
+    set_notification_queue_size(9)
+    observe_notification_processing_duration(0.3)
 
     snap = metrics.snapshot()
     assert snap["counters"]["api_requests_total"] == 1
@@ -75,6 +92,9 @@ def test_domain_recorders_increment_global_registry():
     assert snap["counters"]["notification_outbox_processed_total"] == 1
     assert snap["counters"]["notification_outbox_failed_total"] == 1
     assert snap["counters"]["notification_outbox_retry_total"] == 2
+    assert snap["counters"]["stuck_notification_recovered_total"] == 2
+    assert snap["gauges"]["notification_queue_size"] == 9
+    assert snap["summary_count"]["notification_processing_duration_seconds"] == 1
 
 
 def test_metrics_endpoint_returns_text():

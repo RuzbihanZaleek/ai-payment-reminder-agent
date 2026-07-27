@@ -224,10 +224,35 @@ outbox  (NOTIFICATION_MODE=outbox):
                           └─ fail & attempts >= MAX ─▶ mark FAILED (last_error)
 ```
 
-Outbox state machine: `PENDING → PROCESSING → SENT` | `PENDING` (retry, backoff
-via `available_at`) | `FAILED` (retry budget exhausted). Only `PENDING` rows
-whose `available_at` has passed are eligible, so backoff is enforced purely by a
-future `available_at`. Ordering is oldest-first.
+### Notification lifecycle
+
+```
+                 ┌──────────────────────────────────────────────┐
+                 │                                               │ (retry: attempts < MAX,
+                 ▼                                               │  available_at = now + backoff)
+   [created] ─▶ PENDING ─▶ PROCESSING ─┬─ send OK ─────▶ SENT (sent_at)
+                 ▲             │        │
+                 │             │        └─ send fail & attempts >= MAX ─▶ FAILED (last_error)
+   (worker       │             │                                            │
+    recovery:    │             └── worker crash / timeout ──────────────────┼─────────┐
+    stuck >      │                 (updated_at older than timeout)          │         │
+    timeout,     └────────────────────────────────────────────────────────┘         │
+    attempt++)                                                                        │
+                              admin retry (attempts reset) ◀────────────── FAILED ────┤
+                              admin discard ─────────────────────────────▶ DISCARDED ◀┘
+```
+
+- `PENDING` → `PROCESSING` → `SENT` on success.
+- On failure: retry (`→ PENDING`, `available_at` pushed out by exponential
+  backoff) until attempts reach `NOTIFICATION_MAX_RETRIES`, then `→ FAILED`.
+- Stuck `PROCESSING` (crashed worker, `updated_at` older than
+  `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES`) is recovered `→ PENDING` on the next
+  worker run.
+- `FAILED` is terminal for the worker; an admin either retries it (`→ PENDING`,
+  attempts reset) or discards it (`→ DISCARDED`, terminal).
+
+Only `PENDING` rows whose `available_at` has passed are eligible, so backoff is
+enforced purely by a future `available_at`. Ordering is oldest-first.
 
 ## Worker lifecycle & duplicate prevention
 

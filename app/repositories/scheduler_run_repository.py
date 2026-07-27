@@ -47,6 +47,22 @@ class SchedulerRunRepository:
             .all()
         )
 
+    def get_last_run( self ) -> SchedulerRun | None:
+        return (
+            self.db.query(SchedulerRun)
+            .order_by(SchedulerRun.id.desc())
+            .first()
+        )
+
+    def count_failed( self ) -> int:
+        from app.enums.scheduler_run_status import SchedulerRunStatus
+
+        return (
+            self.db.query(SchedulerRun)
+            .filter(SchedulerRun.status == SchedulerRunStatus.FAILED)
+            .count()
+        )
+
     def get_page(
         self,
         run_filter: SchedulerRunFilter,

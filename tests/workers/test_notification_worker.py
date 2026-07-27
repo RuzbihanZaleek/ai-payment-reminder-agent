@@ -6,12 +6,21 @@ from app.workers.notification_worker import NotificationWorker
 
 
 class FakeOutboxRepository:
-    def __init__(self, pending):
+    def __init__(self, pending, recovered=0):
         self._pending = pending
+        self._recovered = recovered
         self.processing = []
         self.sent = []
         self.failed = []
         self.retried = []
+        self.recover_calls = []
+
+    def recover_stuck_processing(self, timeout_minutes):
+        self.recover_calls.append(timeout_minutes)
+        return self._recovered
+
+    def count_by_status(self, status):
+        return len(self._pending)
 
     def get_pending(self, limit):
         return self._pending[:limit]
@@ -116,3 +125,56 @@ def test_backoff_grows_with_attempts():
 
     _id, _error, backoff = repo.retried[0]
     assert backoff == 4  # base * 2**(2-1)
+
+
+def test_worker_recovers_stuck_before_processing():
+    repo = FakeOutboxRepository([_note(1, "a")], recovered=3)
+    worker = NotificationWorker(
+        repo, FakeNotificationService(), processing_timeout_minutes=15
+    )
+
+    result = worker.process_batch()
+
+    assert repo.recover_calls == [15]
+    assert result.recovered == 3
+
+
+class _SpyAlertService:
+    def __init__(self):
+        self.errors = []
+
+    def notify_warning(self, message, **context):
+        pass
+
+    def notify_error(self, message, **context):
+        self.errors.append((message, context))
+
+
+def test_failure_threshold_triggers_alert():
+    # 2 notifications, both fail at max retries -> 2 failures >= threshold 2.
+    repo = FakeOutboxRepository(
+        [_note(1, "a", attempt_count=2), _note(2, "b", attempt_count=2)]
+    )
+    service = FakeNotificationService(results={"a": False, "b": False})
+    alert = _SpyAlertService()
+    worker = NotificationWorker(
+        repo, service, max_retries=3, failure_alert_threshold=2, alert_service=alert
+    )
+
+    result = worker.process_batch()
+
+    assert result.failed == 2
+    assert len(alert.errors) == 1
+
+
+def test_below_threshold_does_not_alert():
+    repo = FakeOutboxRepository([_note(1, "a", attempt_count=2)])
+    service = FakeNotificationService(results={"a": False})
+    alert = _SpyAlertService()
+    worker = NotificationWorker(
+        repo, service, max_retries=3, failure_alert_threshold=5, alert_service=alert
+    )
+
+    worker.process_batch()
+
+    assert alert.errors == []

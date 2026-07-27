@@ -28,6 +28,7 @@ class NotificationOutbox(Base):
     PROCESSING = "PROCESSING"
     SENT = "SENT"
     FAILED = "FAILED"
+    DISCARDED = "DISCARDED"  # operator gave up on a FAILED message
 
     id = Column( Integer, primary_key=True )
 

@@ -6,11 +6,22 @@ from fastapi.testclient import TestClient
 from types import SimpleNamespace
 
 from app.main import app
-from app.api.dashboard import get_dashboard_service
+from app.api.dashboard import get_dashboard_service, get_system_reporting_service
 from app.api.deps import get_current_user
 
 
 client = TestClient(app)
+
+
+class FakeSystemReportingService:
+    def get_system_stats(self):
+        return {
+            "notification_queue_size": 4,
+            "failed_notification_count": 2,
+            "oldest_pending_notification_age_seconds": 120.0,
+            "scheduler_last_run": None,
+            "scheduler_failure_count": 1,
+        }
 
 
 @pytest.fixture(autouse=True)
@@ -94,3 +105,32 @@ def test_overview_failure_returns_500():
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
+
+
+def test_system_dashboard_requires_admin():
+    # The autouse fixture logs in a non-admin user.
+    app.dependency_overrides[get_system_reporting_service] = (
+        lambda: FakeSystemReportingService()
+    )
+
+    response = client.get("/dashboard/system")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_system_dashboard_returns_queue_metrics_for_admin():
+    app.dependency_overrides[get_current_user] = (
+        lambda: SimpleNamespace(id=1, is_admin=True)
+    )
+    app.dependency_overrides[get_system_reporting_service] = (
+        lambda: FakeSystemReportingService()
+    )
+
+    response = client.get("/dashboard/system")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["notification_queue_size"] == 4
+    assert body["failed_notification_count"] == 2
+    assert body["scheduler_failure_count"] == 1

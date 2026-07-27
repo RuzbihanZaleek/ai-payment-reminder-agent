@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -40,3 +41,12 @@ class DashboardOverview(BaseModel):
     payments: PaymentDashboard
     agents: AgentDashboard
     scheduler: SchedulerDashboard
+
+
+class SystemDashboard(BaseModel):
+
+    notification_queue_size: int
+    failed_notification_count: int
+    oldest_pending_notification_age_seconds: float | None
+    scheduler_last_run: datetime | None
+    scheduler_failure_count: int

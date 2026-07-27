@@ -17,6 +17,7 @@ class MetricsRegistry:
     def __init__(self):
         self._lock = threading.Lock()
         self._counters: dict[str, float] = {}
+        self._gauges: dict[str, float] = {}
         self._summary_sum: dict[str, float] = {}
         self._summary_count: dict[str, int] = {}
         self._help: dict[str, str] = {}
@@ -24,6 +25,12 @@ class MetricsRegistry:
     def inc(self, name: str, amount: float = 1.0, help: str = "") -> None:
         with self._lock:
             self._counters[name] = self._counters.get(name, 0.0) + amount
+            if help and name not in self._help:
+                self._help[name] = help
+
+    def set_gauge(self, name: str, value: float, help: str = "") -> None:
+        with self._lock:
+            self._gauges[name] = value
             if help and name not in self._help:
                 self._help[name] = help
 
@@ -38,6 +45,7 @@ class MetricsRegistry:
         with self._lock:
             return {
                 "counters": dict(self._counters),
+                "gauges": dict(self._gauges),
                 "summary_sum": dict(self._summary_sum),
                 "summary_count": dict(self._summary_count),
             }
@@ -45,6 +53,7 @@ class MetricsRegistry:
     def reset(self) -> None:
         with self._lock:
             self._counters.clear()
+            self._gauges.clear()
             self._summary_sum.clear()
             self._summary_count.clear()
 
@@ -57,6 +66,12 @@ class MetricsRegistry:
                     lines.append(f"# HELP {name} {self._help[name]}")
                 lines.append(f"# TYPE {name} counter")
                 lines.append(f"{name} {self._counters[name]}")
+
+            for name in sorted(self._gauges):
+                if name in self._help:
+                    lines.append(f"# HELP {name} {self._help[name]}")
+                lines.append(f"# TYPE {name} gauge")
+                lines.append(f"{name} {self._gauges[name]}")
 
             for name in sorted(self._summary_sum):
                 if name in self._help:
@@ -123,4 +138,27 @@ def record_notification_retry() -> None:
     metrics.inc(
         "notification_outbox_retry_total",
         help="Outbox notification delivery retries scheduled",
+    )
+
+
+def record_stuck_notification_recovered(count: int = 1) -> None:
+    if count > 0:
+        metrics.inc(
+            "stuck_notification_recovered_total",
+            amount=count,
+            help="Stuck PROCESSING notifications reset to PENDING",
+        )
+
+
+def set_notification_queue_size(size: int) -> None:
+    metrics.set_gauge(
+        "notification_queue_size", size, help="Pending notifications in the outbox"
+    )
+
+
+def observe_notification_processing_duration(seconds: float) -> None:
+    metrics.observe(
+        "notification_processing_duration_seconds",
+        seconds,
+        help="Time to deliver a single outbox notification",
     )

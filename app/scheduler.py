@@ -10,6 +10,7 @@ from app.core.logger import get_logger, set_request_id
 from app.core.metrics import record_reminder
 from app.db.session import SessionLocal
 from app.services.scheduler_lock_service import SchedulerLockService
+from app.services.alert_service import default_alert_service
 from app.container import (
     create_reminder_service,
     create_reminder_execution_service,
@@ -182,6 +183,12 @@ def _execute_daily_reminders():
                 scheduler_run,
                 SchedulerRunStatus.FAILED,
             )
+
+        default_alert_service.notify_error(
+            "Daily reminder scheduler run failed",
+            scheduler_run_id=getattr(scheduler_run, "id", None),
+            correlation_id=correlation_id,
+        )
 
         raise
 

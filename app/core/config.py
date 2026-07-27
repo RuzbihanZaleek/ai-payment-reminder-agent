@@ -85,6 +85,11 @@ class Settings(BaseSettings):
     # Advisory-lock key so only one replica's worker runs at a time (distinct
     # from the reminder scheduler's lock).
     NOTIFICATION_WORKER_LOCK_ID: int = 902_025_106
+    # A message stuck in PROCESSING longer than this is presumed abandoned (a
+    # crashed worker) and returned to PENDING.
+    NOTIFICATION_PROCESSING_TIMEOUT_MINUTES: int = 15
+    # Emit an alert when a single worker pass fails at least this many messages.
+    NOTIFICATION_FAILURE_ALERT_THRESHOLD: int = 10
 
     # --- Rate limiting ------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = True

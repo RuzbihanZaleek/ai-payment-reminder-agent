@@ -22,4 +22,7 @@ class User(Base):
 
     is_active = Column( Boolean, nullable=False, default=True )
 
+    # Grants access to the /admin operational endpoints.
+    is_admin = Column( Boolean, nullable=False, default=False, server_default=func.false() )
+
     created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )

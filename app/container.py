@@ -49,7 +49,10 @@ from app.services.agent_analytics_service import AgentAnalyticsService
 from app.services.analytics_service import AnalyticsService
 from app.services.auth_service import AuthService
 from app.services.notification_outbox_service import NotificationOutboxService
+from app.services.notification_recovery_service import NotificationRecoveryService
+from app.services.system_reporting_service import SystemReportingService
 from app.services.audit_service import AuditService
+from app.services.alert_service import AlertService, LoggingAlertService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -455,6 +458,37 @@ def create_notification_outbox_service(
     return NotificationOutboxService(NotificationOutboxRepository(db))
 
 
+def create_alert_service() -> AlertService:
+    """Compose the operational alert service (log-based by default)."""
+
+    return LoggingAlertService()
+
+
+def create_notification_recovery_service(
+    db=None,
+) -> NotificationRecoveryService:
+    """Compose the dead-letter recovery service used by the admin API."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return NotificationRecoveryService(NotificationOutboxRepository(db))
+
+
+def create_system_reporting_service(
+    db=None,
+) -> SystemReportingService:
+    """Compose the operational system-health reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return SystemReportingService(
+        NotificationOutboxRepository(db),
+        SchedulerRunRepository(db),
+    )
+
+
 def create_notification_worker(
     db=None,
 ):
@@ -480,6 +514,9 @@ def create_notification_worker(
         max_retries=settings.NOTIFICATION_MAX_RETRIES,
         retry_base_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
         batch_size=settings.NOTIFICATION_WORKER_BATCH_SIZE,
+        processing_timeout_minutes=settings.NOTIFICATION_PROCESSING_TIMEOUT_MINUTES,
+        failure_alert_threshold=settings.NOTIFICATION_FAILURE_ALERT_THRESHOLD,
+        alert_service=create_alert_service(),
     )
 
 

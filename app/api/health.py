@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.core.logger import get_logger
 from app.core.metrics import metrics
+from app.services.alert_service import default_alert_service
 
 
 logger = get_logger(__name__)
@@ -50,6 +51,7 @@ def _check_database() -> bool:
         return True
     except Exception:
         logger.warning("readiness_database_check_failed")
+        default_alert_service.notify_error("Database readiness check failed")
         return False
     finally:
         db.close()

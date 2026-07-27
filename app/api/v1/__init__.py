@@ -16,6 +16,7 @@ from app.api.reports.agent_runs import router as reports_agent_runs_router
 from app.api.reports.scheduler_runs import router as reports_scheduler_runs_router
 from app.api.dashboard import router as dashboard_router
 from app.api.analytics import router as analytics_router
+from app.api.admin.notifications import router as admin_notifications_router
 
 
 API_V1_PREFIX = "/api/v1"
@@ -32,6 +33,7 @@ _FEATURE_ROUTERS = [
     reports_scheduler_runs_router,
     dashboard_router,
     analytics_router,
+    admin_notifications_router,
 ]
 
 for _router in _FEATURE_ROUTERS:
