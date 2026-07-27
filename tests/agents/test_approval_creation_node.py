@@ -78,3 +78,68 @@ def test_no_approval_when_confidence_high():
 
     assert service.created == []
     assert result.payment_id is None
+
+
+def _approval_state_without_contract(message: str) -> AgentState:
+
+    # requires_approval with no single resolved contract -> cannot persist a
+    # pending Payment (payments.contract_id is NOT NULL).
+    return AgentState(
+        message=message,
+        message_id="msg_1",
+        contract_id=None,
+        requires_approval=True,
+        payment_detection=_detection(),
+    )
+
+
+def test_no_payment_for_ambiguous_multi_contract_approval():
+
+    service = FakePaymentService()
+    node = ApprovalCreationNode(service)
+
+    result = node.execute(
+        _approval_state_without_contract("Paid INV001 and INV002")
+    )
+
+    assert service.created == []
+    assert result.requires_approval is True
+
+
+def test_no_payment_for_invalid_reference_approval():
+
+    service = FakePaymentService()
+    node = ApprovalCreationNode(service)
+
+    result = node.execute(
+        _approval_state_without_contract("Paid INV999 $20")
+    )
+
+    assert service.created == []
+    assert result.requires_approval is True
+
+
+def test_no_payment_for_uneven_payment_approval():
+
+    service = FakePaymentService()
+    node = ApprovalCreationNode(service)
+
+    result = node.execute(
+        _approval_state_without_contract("I paid 65")
+    )
+
+    assert service.created == []
+    assert result.requires_approval is True
+
+
+def test_no_payment_created_when_contract_id_missing():
+
+    service = FakePaymentService()
+    node = ApprovalCreationNode(service)
+
+    result = node.execute(_approval_state_without_contract("I paid 100"))
+
+    assert service.created == []
+    # Approval state is preserved for a human to handle.
+    assert result.requires_approval is True
+    assert result.payment_id is None

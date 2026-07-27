@@ -25,6 +25,12 @@ class ApprovalCreationNode:
         if not state.requires_approval:
             return state
 
+        # Cannot create a pending Payment without a contract (payments.contract_id
+        # is NOT NULL). This happens for ambiguous / unknown / uneven multi-contract
+        # cases where no single contract was resolved -> keep approval, do nothing.
+        if state.contract_id is None:
+            return state
+
         detection = state.payment_detection
 
         if detection is None or detection.amount is None:

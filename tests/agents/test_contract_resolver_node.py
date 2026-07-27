@@ -45,7 +45,7 @@ def test_resolves_explicit_reference():
     assert result.requires_approval is False
 
 
-def test_unknown_reference_defers_to_allocation():
+def test_unknown_reference_requires_approval():
 
     node = ContractResolverNode()
 
@@ -57,11 +57,11 @@ def test_unknown_reference_defers_to_allocation():
 
     result = node.execute(state)
 
-    # No matching reference -> don't resolve, don't force approval here;
-    # automatic allocation happens downstream.
+    # A reference-like token (INV999) matching no contract is an unknown
+    # reference -> require approval; never fall through to allocation.
     assert result.contract_ids == []
     assert result.contract_id is None
-    assert result.requires_approval is False
+    assert result.requires_approval is True
 
 
 def test_no_reference_defers_to_allocation():
