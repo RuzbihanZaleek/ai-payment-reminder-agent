@@ -28,3 +28,10 @@ class PaymentReceiptRepository:
             .filter(PaymentReceipt.agent_run_id == agent_run_id)
             .all()
         )
+
+    def get_by_contract_id( self, contract_id: int ) -> list[PaymentReceipt]:
+        return (
+            self.db.query(PaymentReceipt)
+            .filter(PaymentReceipt.contract_id == contract_id)
+            .all()
+        )

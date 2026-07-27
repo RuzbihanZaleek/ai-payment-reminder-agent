@@ -29,3 +29,11 @@ class SchedulerRunRepository:
             .filter(SchedulerRun.id == scheduler_run_id)
             .first()
         )
+
+    def get_recent( self, limit: int = 20 ) -> list[SchedulerRun]:
+        return (
+            self.db.query(SchedulerRun)
+            .order_by(SchedulerRun.id.desc())
+            .limit(limit)
+            .all()
+        )

@@ -14,3 +14,10 @@ class SchedulerEventRepository:
         self.db.refresh(scheduler_event)
 
         return scheduler_event
+
+    def get_by_run_id( self, scheduler_run_id: int ) -> list[SchedulerEvent]:
+        return (
+            self.db.query(SchedulerEvent)
+            .filter(SchedulerEvent.scheduler_run_id == scheduler_run_id)
+            .all()
+        )

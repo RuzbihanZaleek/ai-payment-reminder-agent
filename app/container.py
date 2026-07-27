@@ -30,6 +30,11 @@ from app.services.reminder_service import ReminderService
 from app.services.reminder_policy_service import ReminderPolicyService
 from app.services.reminder_execution_service import ReminderExecutionService
 from app.services.conversation_memory_service import ConversationMemoryService
+from app.services.contract_reporting_service import ContractReportingService
+from app.services.payment_reporting_service import PaymentReportingService
+from app.services.receipt_reporting_service import ReceiptReportingService
+from app.services.agent_reporting_service import AgentReportingService
+from app.services.scheduler_reporting_service import SchedulerReportingService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -287,4 +292,70 @@ def create_conversation_memory_service(
         conversation_repository,
         conversation_message_repository,
         conversation_summary_repository,
+    )
+
+
+def create_contract_reporting_service(
+    db=None,
+) -> ContractReportingService:
+    """Compose the read-only contract summary reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    contract_service = ContractService(ContractRepository(db))
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return ContractReportingService(contract_service, payment_service)
+
+
+def create_payment_reporting_service(
+    db=None,
+) -> PaymentReportingService:
+    """Compose the read-only payment history reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return PaymentReportingService(payment_service)
+
+
+def create_receipt_reporting_service(
+    db=None,
+) -> ReceiptReportingService:
+    """Compose the read-only receipt history reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return ReceiptReportingService(PaymentReceiptRepository(db))
+
+
+def create_agent_reporting_service(
+    db=None,
+) -> AgentReportingService:
+    """Compose the read-only agent run reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return AgentReportingService(
+        AgentRunRepository(db),
+        AgentEventRepository(db),
+    )
+
+
+def create_scheduler_reporting_service(
+    db=None,
+) -> SchedulerReportingService:
+    """Compose the read-only scheduler run reporting service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return SchedulerReportingService(
+        SchedulerRunRepository(db),
+        SchedulerEventRepository(db),
     )

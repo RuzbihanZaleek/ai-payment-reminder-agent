@@ -22,6 +22,14 @@ class AgentRunRepository:
             .first()
         )
 
+    def get_recent( self, limit: int = 20 ) -> list[AgentRun]:
+        return (
+            self.db.query(AgentRun)
+            .order_by(AgentRun.id.desc())
+            .limit(limit)
+            .all()
+        )
+
     def get_all( self ) -> list[AgentRun]:
         return (
             self.db.query(AgentRun)
