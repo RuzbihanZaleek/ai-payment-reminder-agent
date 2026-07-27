@@ -31,55 +31,73 @@ def send_daily_reminders():
     run_repository = create_scheduler_run_repository()
     event_repository = create_scheduler_event_repository()
 
-    scheduler_run = run_repository.create(
-        SchedulerRun(
-            run_type="daily_reminders",
-            status=SchedulerRunStatus.RUNNING,
+    scheduler_run = None
+
+    try:
+        scheduler_run = run_repository.create(
+            SchedulerRun(
+                run_type="daily_reminders",
+                status=SchedulerRunStatus.RUNNING,
+            )
         )
-    )
 
-    contracts = reminder_service.get_pending_reminders()
+        contracts = reminder_service.get_pending_reminders()
 
-    successful_count = 0
-    failed_count = 0
+        successful_count = 0
+        failed_count = 0
 
-    for contract in contracts:
-        try:
-            reminder_execution_service.execute(contract)
-        except Exception as exc:
-            failed_count += 1
+        for contract in contracts:
+            # A single contract failing is expected and must not abort the run.
+            try:
+                reminder_execution_service.execute(contract)
+            except Exception as exc:
+                failed_count += 1
+
+                event_repository.create(
+                    SchedulerEvent(
+                        scheduler_run_id=scheduler_run.id,
+                        contract_id=contract.id,
+                        status="FAILED",
+                        message=str(exc),
+                    )
+                )
+
+                logger.exception(
+                    "Reminder execution failed for contract %s",
+                    getattr(contract, "id", None),
+                )
+                continue
+
+            successful_count += 1
 
             event_repository.create(
                 SchedulerEvent(
                     scheduler_run_id=scheduler_run.id,
                     contract_id=contract.id,
-                    status="FAILED",
-                    message=str(exc),
+                    status="SENT",
                 )
             )
 
-            logger.exception(
-                "Reminder execution failed for contract %s",
-                getattr(contract, "id", None),
+        scheduler_run.total_contracts = len(contracts)
+        scheduler_run.successful_count = successful_count
+        scheduler_run.failed_count = failed_count
+        scheduler_run.completed_at = datetime.now(timezone.utc)
+
+        run_repository.update_status(scheduler_run, SchedulerRunStatus.COMPLETED)
+
+    except Exception:
+        # A top-level failure (e.g. fetching contracts, or a repository error)
+        # marks the whole run FAILED before propagating.
+        logger.exception("Scheduler run failed")
+
+        if scheduler_run is not None:
+            scheduler_run.completed_at = datetime.now(timezone.utc)
+            run_repository.update_status(
+                scheduler_run,
+                SchedulerRunStatus.FAILED,
             )
-            continue
 
-        successful_count += 1
-
-        event_repository.create(
-            SchedulerEvent(
-                scheduler_run_id=scheduler_run.id,
-                contract_id=contract.id,
-                status="SENT",
-            )
-        )
-
-    scheduler_run.total_contracts = len(contracts)
-    scheduler_run.successful_count = successful_count
-    scheduler_run.failed_count = failed_count
-    scheduler_run.completed_at = datetime.now(timezone.utc)
-
-    run_repository.update_status(scheduler_run, SchedulerRunStatus.COMPLETED)
+        raise
 
 
 def create_scheduler() -> BackgroundScheduler:

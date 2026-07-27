@@ -1,3 +1,5 @@
+import pytest
+
 import app.scheduler as scheduler_module
 from app.enums.scheduler_run_status import SchedulerRunStatus
 
@@ -159,3 +161,67 @@ def test_run_counts_updated_correctly(monkeypatch):
     assert run_repo.run.successful_count == 2
     assert run_repo.run.failed_count == 1
     assert run_repo.run.status == SchedulerRunStatus.COMPLETED
+
+
+class FailingReminderService:
+
+    def get_pending_reminders(self):
+
+        raise RuntimeError("cannot fetch contracts")
+
+
+def test_top_level_failure_marks_run_failed(monkeypatch):
+
+    run_repo = FakeSchedulerRunRepository()
+    event_repo = FakeSchedulerEventRepository()
+
+    # A failure *outside* the per-contract loop (here, fetching contracts).
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_service",
+        lambda: FailingReminderService(),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_execution_service",
+        lambda: FakeReminderExecutionService(),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_scheduler_run_repository",
+        lambda: run_repo,
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_scheduler_event_repository",
+        lambda: event_repo,
+    )
+
+    with pytest.raises(RuntimeError):
+        scheduler_module.send_daily_reminders()
+
+    # The run is marked FAILED (not left RUNNING) and timestamped.
+    assert run_repo.run.status == SchedulerRunStatus.FAILED
+    assert run_repo.run.completed_at is not None
+
+
+def test_contract_failure_still_completes_run(monkeypatch):
+
+    contracts = [FakeContract(1), FakeContract(2)]
+    execution_service = FakeReminderExecutionService(fail_ids={2})
+    run_repo = FakeSchedulerRunRepository()
+    event_repo = FakeSchedulerEventRepository()
+
+    _install(monkeypatch, contracts, execution_service, run_repo, event_repo)
+
+    scheduler_module.send_daily_reminders()
+
+    # Individual contract failure -> a FAILED event...
+    failed_events = [e for e in event_repo.events if e.status == "FAILED"]
+    assert len(failed_events) == 1
+    assert failed_events[0].contract_id == 2
+
+    # ...but the run as a whole still COMPLETES (not FAILED).
+    assert run_repo.run.status == SchedulerRunStatus.COMPLETED
+    assert run_repo.run.successful_count == 1
+    assert run_repo.run.failed_count == 1
