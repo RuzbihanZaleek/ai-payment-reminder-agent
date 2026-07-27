@@ -15,11 +15,22 @@ class ContractResolverNode:
 
         available = state.resolved_contracts
 
-        # No multi-contract context (e.g. the direct /agent/messages path with
-        # an explicit contract_id) -> nothing to resolve.
+        # Rule 1: no multi-contract context (e.g. the direct /agent/messages
+        # path with an explicit contract_id) -> nothing to resolve.
         if not available:
             return state
 
+        # Rule 2: exactly one active contract -> unambiguous, auto-resolve
+        # without requiring approval (no reference code needed).
+        if len(available) == 1:
+            contract_id = available[0]["id"]
+            state.contract_id = contract_id
+            state.contract_ids = [contract_id]
+
+            return state
+
+        # Rule 3: multiple contracts -> require an explicit, unambiguous
+        # reference. Never guess.
         message = (state.message or "").lower()
 
         matched_ids = [
@@ -31,7 +42,6 @@ class ContractResolverNode:
         state.contract_ids = matched_ids
 
         if len(matched_ids) == 1:
-            # Exactly one explicit reference -> resolved.
             state.contract_id = matched_ids[0]
         else:
             # Zero references (don't guess) or ambiguous -> needs a human.

@@ -10,6 +10,24 @@ def _available():
     ]
 
 
+def test_single_contract_auto_resolves_without_reference():
+
+    node = ContractResolverNode()
+
+    # One active contract, message has NO reference code -> auto-resolve.
+    state = AgentState(
+        message="I paid 100 today",
+        requires_approval=False,
+        resolved_contracts=[{"id": 5, "reference_code": "INV001"}],
+    )
+
+    result = node.execute(state)
+
+    assert result.contract_id == 5
+    assert result.contract_ids == [5]
+    assert result.requires_approval is False
+
+
 def test_resolves_explicit_reference():
 
     node = ContractResolverNode()
