@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from app.models.payment import Payment
 from app.services.payment_service import PaymentService
 
@@ -22,9 +20,9 @@ class PaymentReportingService:
 
         return {
             "payment_transaction_count": len(payments),
-            "total_amount_received": sum(
-                (payment.amount for payment in payments),
-                Decimal("0"),
-            ),
-            "pending_approval_count": self.payment_service.count_pending_approvals(),
+            # Confirmed money only (approval_status == APPROVED).
+            "total_amount_received": self.payment_service.calculate_total_received(),
+            # Payments awaiting a human decision (manual review + PENDING).
+            "pending_review_count": self.payment_service.count_pending_approvals(),
+            "pending_review_amount": self.payment_service.calculate_pending_review_amount(),
         }

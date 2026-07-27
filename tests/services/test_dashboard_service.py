@@ -61,7 +61,8 @@ def test_aggregates_all_sections():
         payments={
             "payment_transaction_count": 12,
             "total_amount_received": Decimal("240"),
-            "pending_approval_count": 2,
+            "pending_review_count": 2,
+            "pending_review_amount": Decimal("50"),
         },
         agents={"total_agent_runs": 20, "completed_runs": 18, "failed_runs": 2},
         scheduler={
@@ -78,7 +79,8 @@ def test_aggregates_all_sections():
     assert overview["contracts"]["total_remaining_amount"] == Decimal("1500")
     assert overview["payments"]["payment_transaction_count"] == 12
     assert overview["payments"]["total_amount_received"] == Decimal("240")
-    assert overview["payments"]["pending_approval_count"] == 2
+    assert overview["payments"]["pending_review_count"] == 2
+    assert overview["payments"]["pending_review_amount"] == Decimal("50")
     assert overview["agents"]["completed_runs"] == 18
     assert overview["scheduler"]["total_reminders_sent"] == 30
     assert overview["scheduler"]["total_reminders_failed"] == 3
@@ -98,7 +100,8 @@ def test_empty_data():
         payments={
             "payment_transaction_count": 0,
             "total_amount_received": Decimal("0"),
-            "pending_approval_count": 0,
+            "pending_review_count": 0,
+            "pending_review_amount": Decimal("0"),
         },
         agents={"total_agent_runs": 0, "completed_runs": 0, "failed_runs": 0},
         scheduler={

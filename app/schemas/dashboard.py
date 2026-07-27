@@ -15,7 +15,8 @@ class PaymentDashboard(BaseModel):
 
     payment_transaction_count: int
     total_amount_received: Decimal
-    pending_approval_count: int
+    pending_review_count: int
+    pending_review_amount: Decimal
 
 
 class AgentDashboard(BaseModel):

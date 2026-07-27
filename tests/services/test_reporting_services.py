@@ -201,31 +201,43 @@ class _Payment:
 
 
 class FakePaymentServiceStats:
-    def __init__(self, payments, pending_count):
+    def __init__(self, payments, total_received, pending_count, pending_amount):
         self.payments = payments
+        self.total_received = total_received
         self.pending_count = pending_count
+        self.pending_amount = pending_amount
 
     def get_all_payments(self):
         return self.payments
 
+    def calculate_total_received(self):
+        return self.total_received
+
     def count_pending_approvals(self):
         return self.pending_count
 
+    def calculate_pending_review_amount(self):
+        return self.pending_amount
 
-def test_payment_stats_transaction_count_and_total():
+
+def test_payment_stats_transaction_count_and_confirmed_total():
 
     service = PaymentReportingService(
         FakePaymentServiceStats(
-            [_Payment(Decimal("20")), _Payment(Decimal("30")), _Payment(Decimal("10"))],
+            payments=[_Payment(Decimal("20")), _Payment(Decimal("30")), _Payment(Decimal("10"))],
+            total_received=Decimal("40"),
             pending_count=2,
+            pending_amount=Decimal("50"),
         )
     )
 
     stats = service.get_payment_stats()
 
     assert stats["payment_transaction_count"] == 3
-    assert stats["total_amount_received"] == Decimal("60")
-    assert stats["pending_approval_count"] == 2
+    # Confirmed money only, not the sum of all transactions.
+    assert stats["total_amount_received"] == Decimal("40")
+    assert stats["pending_review_count"] == 2
+    assert stats["pending_review_amount"] == Decimal("50")
 
 
 class _Run:
@@ -263,25 +275,62 @@ def test_scheduler_stats_runs_and_reminder_deliveries():
     assert stats["total_reminders_failed"] == 2
 
 
-class _PendingPayment:
-    def __init__(self, requires_manual_review):
+class _ApprovalPayment:
+    def __init__(self, amount, approval_status, requires_manual_review):
+        self.amount = amount
+        self.approval_status = approval_status
         self.requires_manual_review = requires_manual_review
 
 
 class FakePaymentRepoApproval:
-    def __init__(self, pending):
-        self.pending = pending
+    def __init__(self, payments):
+        self.payments = payments
 
     def get_by_approval_status(self, status):
-        return self.pending
+        return [p for p in self.payments if p.approval_status == status]
 
 
-def test_pending_approval_counts_only_manual_review():
-
+def _payment_service_with(payments):
     from app.services.payment_service import PaymentService
 
-    repo = FakePaymentRepoApproval(
-        [_PendingPayment(True), _PendingPayment(False), _PendingPayment(True)]
-    )
+    return PaymentService(FakePaymentRepoApproval(payments))
 
-    assert PaymentService(repo).count_pending_approvals() == 2
+
+def test_pending_review_counts_only_manual_review():
+
+    from app.enums.approval_status import ApprovalStatus
+
+    service = _payment_service_with([
+        _ApprovalPayment(Decimal("20"), ApprovalStatus.PENDING, True),
+        _ApprovalPayment(Decimal("30"), ApprovalStatus.PENDING, False),
+        _ApprovalPayment(Decimal("15"), ApprovalStatus.PENDING, True),
+    ])
+
+    assert service.count_pending_approvals() == 2
+
+
+def test_pending_review_amount_sums_only_manual_review():
+
+    from app.enums.approval_status import ApprovalStatus
+
+    service = _payment_service_with([
+        _ApprovalPayment(Decimal("20"), ApprovalStatus.PENDING, True),
+        _ApprovalPayment(Decimal("30"), ApprovalStatus.PENDING, False),
+        _ApprovalPayment(Decimal("15"), ApprovalStatus.PENDING, True),
+    ])
+
+    assert service.calculate_pending_review_amount() == Decimal("35")
+
+
+def test_total_received_includes_only_approved():
+
+    from app.enums.approval_status import ApprovalStatus
+
+    service = _payment_service_with([
+        _ApprovalPayment(Decimal("40"), ApprovalStatus.APPROVED, False),
+        _ApprovalPayment(Decimal("30"), ApprovalStatus.PENDING, False),   # excluded
+        _ApprovalPayment(Decimal("25"), ApprovalStatus.APPROVED, False),
+        _ApprovalPayment(Decimal("10"), ApprovalStatus.REJECTED, False),  # excluded
+    ])
+
+    assert service.calculate_total_received() == Decimal("65")

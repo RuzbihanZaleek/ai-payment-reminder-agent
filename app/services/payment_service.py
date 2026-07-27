@@ -19,13 +19,31 @@ class PaymentService:
     def get_all_payments( self ) -> list[Payment]:
         return self.repository.get_all()
 
-    def count_pending_approvals( self ) -> int:
-        # Only payments that genuinely need a human decision count towards the
-        # approval queue -- normal auto-processed payments default to PENDING
-        # approval_status but do not require manual review.
+    def _pending_manual_review_payments( self ) -> list[Payment]:
+        # Payments that genuinely need a human decision: normal auto-processed
+        # payments default to PENDING approval_status but do not require review.
         pending = self.repository.get_by_approval_status(ApprovalStatus.PENDING)
 
-        return sum( 1 for payment in pending if payment.requires_manual_review )
+        return [payment for payment in pending if payment.requires_manual_review]
+
+    def count_pending_approvals( self ) -> int:
+        return len(self._pending_manual_review_payments())
+
+    def calculate_pending_review_amount( self ) -> Decimal:
+        return sum(
+            ( payment.amount for payment in self._pending_manual_review_payments() ),
+            Decimal("0"),
+        )
+
+    def calculate_total_received( self ) -> Decimal:
+        # Confirmed money only: payments a human (or the approval flow) marked
+        # APPROVED. Pending / rejected payments are not counted as received.
+        approved = self.repository.get_by_approval_status(ApprovalStatus.APPROVED)
+
+        return sum(
+            ( payment.amount for payment in approved ),
+            Decimal("0"),
+        )
     
     def get_contract_payments( self, contract_id: int ) -> list[Payment]:
         return self.repository.get_by_contract_id(contract_id)
