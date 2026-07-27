@@ -54,6 +54,7 @@ def test_creates_approval_when_confidence_low():
 
     assert created.status == PaymentStatus.PENDING
     assert created.approval_status == ApprovalStatus.PENDING
+    assert created.requires_manual_review is True
     assert created.amount == Decimal("100.00")
     assert created.contract_id == 1
 

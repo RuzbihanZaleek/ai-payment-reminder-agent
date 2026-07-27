@@ -37,6 +37,7 @@ class ApprovalCreationNode:
             return state
 
         # Create a PENDING payment awaiting approval -- never an approved one.
+        # This payment exists precisely because a human decision is required.
         payment = Payment(
             contract_id=state.contract_id,
             amount=detection.amount,
@@ -45,6 +46,7 @@ class ApprovalCreationNode:
             else date.today(),
             status=PaymentStatus.PENDING,
             approval_status=ApprovalStatus.PENDING,
+            requires_manual_review=True,
             source=PaymentSource.WHATSAPP_AI,
             reference_message_id=state.message_id,
             notes=state.message,

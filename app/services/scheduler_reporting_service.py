@@ -36,10 +36,10 @@ class SchedulerReportingService:
 
         return {
             "total_scheduler_runs": len(runs),
-            "successful_runs": sum(
-                1 for r in runs if r.status == SchedulerRunStatus.COMPLETED
-            ),
-            "failed_runs": sum(
+            "failed_scheduler_runs": sum(
                 1 for r in runs if r.status == SchedulerRunStatus.FAILED
             ),
+            # Reminder delivery counts aggregate the per-run tallies.
+            "total_reminders_sent": sum(r.successful_count for r in runs),
+            "total_reminders_failed": sum(r.failed_count for r in runs),
         }

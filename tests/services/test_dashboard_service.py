@@ -58,18 +58,30 @@ def test_aggregates_all_sections():
             "completed_contracts": 2,
             "total_remaining_amount": Decimal("1500"),
         },
-        payments={"total_payments_received": 12, "pending_approval_count": 2},
+        payments={
+            "payment_transaction_count": 12,
+            "total_amount_received": Decimal("240"),
+            "pending_approval_count": 2,
+        },
         agents={"total_agent_runs": 20, "completed_runs": 18, "failed_runs": 2},
-        scheduler={"total_scheduler_runs": 7, "successful_runs": 6, "failed_runs": 1},
+        scheduler={
+            "total_scheduler_runs": 7,
+            "failed_scheduler_runs": 1,
+            "total_reminders_sent": 30,
+            "total_reminders_failed": 3,
+        },
     )
 
     overview = service.get_overview()
 
     assert overview["contracts"]["total_contracts"] == 5
     assert overview["contracts"]["total_remaining_amount"] == Decimal("1500")
+    assert overview["payments"]["payment_transaction_count"] == 12
+    assert overview["payments"]["total_amount_received"] == Decimal("240")
     assert overview["payments"]["pending_approval_count"] == 2
     assert overview["agents"]["completed_runs"] == 18
-    assert overview["scheduler"]["failed_runs"] == 1
+    assert overview["scheduler"]["total_reminders_sent"] == 30
+    assert overview["scheduler"]["total_reminders_failed"] == 3
 
 
 def test_empty_data():
@@ -83,14 +95,23 @@ def test_empty_data():
 
     service = _service(
         contracts=zero_contracts,
-        payments={"total_payments_received": 0, "pending_approval_count": 0},
+        payments={
+            "payment_transaction_count": 0,
+            "total_amount_received": Decimal("0"),
+            "pending_approval_count": 0,
+        },
         agents={"total_agent_runs": 0, "completed_runs": 0, "failed_runs": 0},
-        scheduler={"total_scheduler_runs": 0, "successful_runs": 0, "failed_runs": 0},
+        scheduler={
+            "total_scheduler_runs": 0,
+            "failed_scheduler_runs": 0,
+            "total_reminders_sent": 0,
+            "total_reminders_failed": 0,
+        },
     )
 
     overview = service.get_overview()
 
     assert overview["contracts"]["total_contracts"] == 0
-    assert overview["payments"]["total_payments_received"] == 0
+    assert overview["payments"]["payment_transaction_count"] == 0
     assert overview["agents"]["total_agent_runs"] == 0
     assert overview["scheduler"]["total_scheduler_runs"] == 0

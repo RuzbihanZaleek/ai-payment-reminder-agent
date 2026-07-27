@@ -20,7 +20,12 @@ class PaymentService:
         return self.repository.get_all()
 
     def count_pending_approvals( self ) -> int:
-        return len(self.repository.get_by_approval_status(ApprovalStatus.PENDING))
+        # Only payments that genuinely need a human decision count towards the
+        # approval queue -- normal auto-processed payments default to PENDING
+        # approval_status but do not require manual review.
+        pending = self.repository.get_by_approval_status(ApprovalStatus.PENDING)
+
+        return sum( 1 for payment in pending if payment.requires_manual_review )
     
     def get_contract_payments( self, contract_id: int ) -> list[Payment]:
         return self.repository.get_by_contract_id(contract_id)

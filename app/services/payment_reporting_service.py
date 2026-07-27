@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from app.models.payment import Payment
 from app.services.payment_service import PaymentService
 
@@ -16,7 +18,13 @@ class PaymentReportingService:
 
     def get_payment_stats(self) -> dict:
 
+        payments = self.payment_service.get_all_payments()
+
         return {
-            "total_payments_received": len(self.payment_service.get_all_payments()),
+            "payment_transaction_count": len(payments),
+            "total_amount_received": sum(
+                (payment.amount for payment in payments),
+                Decimal("0"),
+            ),
             "pending_approval_count": self.payment_service.count_pending_approvals(),
         }

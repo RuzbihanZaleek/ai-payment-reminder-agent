@@ -2,6 +2,7 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
+    Boolean,
     Date,
     DateTime,
     Numeric,
@@ -32,6 +33,8 @@ class Payment(Base):
     status = Column( Enum(PaymentStatus), nullable=False, default=PaymentStatus.PENDING )
 
     approval_status = Column( Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.PENDING )
+
+    requires_manual_review = Column( Boolean, nullable=False, default=False )
 
     source = Column( Enum(PaymentSource), nullable=False, default=PaymentSource.MANUAL )
     

@@ -13,7 +13,8 @@ class ContractDashboard(BaseModel):
 
 class PaymentDashboard(BaseModel):
 
-    total_payments_received: int
+    payment_transaction_count: int
+    total_amount_received: Decimal
     pending_approval_count: int
 
 
@@ -27,8 +28,9 @@ class AgentDashboard(BaseModel):
 class SchedulerDashboard(BaseModel):
 
     total_scheduler_runs: int
-    successful_runs: int
-    failed_runs: int
+    failed_scheduler_runs: int
+    total_reminders_sent: int
+    total_reminders_failed: int
 
 
 class DashboardOverview(BaseModel):

@@ -192,3 +192,96 @@ def test_scheduler_details_missing_returns_none():
     )
 
     assert service.get_run_details(999) is None
+
+# --- Phase 9.1.1 refinements -------------------------------------------------
+
+class _Payment:
+    def __init__(self, amount):
+        self.amount = amount
+
+
+class FakePaymentServiceStats:
+    def __init__(self, payments, pending_count):
+        self.payments = payments
+        self.pending_count = pending_count
+
+    def get_all_payments(self):
+        return self.payments
+
+    def count_pending_approvals(self):
+        return self.pending_count
+
+
+def test_payment_stats_transaction_count_and_total():
+
+    service = PaymentReportingService(
+        FakePaymentServiceStats(
+            [_Payment(Decimal("20")), _Payment(Decimal("30")), _Payment(Decimal("10"))],
+            pending_count=2,
+        )
+    )
+
+    stats = service.get_payment_stats()
+
+    assert stats["payment_transaction_count"] == 3
+    assert stats["total_amount_received"] == Decimal("60")
+    assert stats["pending_approval_count"] == 2
+
+
+class _Run:
+    def __init__(self, status, successful_count, failed_count):
+        self.status = status
+        self.successful_count = successful_count
+        self.failed_count = failed_count
+
+
+class FakeSchedulerRunRepoStats:
+    def __init__(self, runs):
+        self.runs = runs
+
+    def get_all(self):
+        return self.runs
+
+
+def test_scheduler_stats_runs_and_reminder_deliveries():
+
+    from app.enums.scheduler_run_status import SchedulerRunStatus
+
+    runs = [
+        _Run(SchedulerRunStatus.COMPLETED, 3, 1),
+        _Run(SchedulerRunStatus.FAILED, 0, 0),
+        _Run(SchedulerRunStatus.COMPLETED, 2, 1),
+    ]
+
+    service = SchedulerReportingService(FakeSchedulerRunRepoStats(runs), None)
+
+    stats = service.get_scheduler_stats()
+
+    assert stats["total_scheduler_runs"] == 3
+    assert stats["failed_scheduler_runs"] == 1
+    assert stats["total_reminders_sent"] == 5
+    assert stats["total_reminders_failed"] == 2
+
+
+class _PendingPayment:
+    def __init__(self, requires_manual_review):
+        self.requires_manual_review = requires_manual_review
+
+
+class FakePaymentRepoApproval:
+    def __init__(self, pending):
+        self.pending = pending
+
+    def get_by_approval_status(self, status):
+        return self.pending
+
+
+def test_pending_approval_counts_only_manual_review():
+
+    from app.services.payment_service import PaymentService
+
+    repo = FakePaymentRepoApproval(
+        [_PendingPayment(True), _PendingPayment(False), _PendingPayment(True)]
+    )
+
+    assert PaymentService(repo).count_pending_approvals() == 2

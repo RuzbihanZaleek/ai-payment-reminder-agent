@@ -39,9 +39,18 @@ def _overview():
             "completed_contracts": 2,
             "total_remaining_amount": Decimal("1500"),
         },
-        "payments": {"total_payments_received": 12, "pending_approval_count": 2},
+        "payments": {
+            "payment_transaction_count": 12,
+            "total_amount_received": Decimal("240"),
+            "pending_approval_count": 2,
+        },
         "agents": {"total_agent_runs": 20, "completed_runs": 18, "failed_runs": 2},
-        "scheduler": {"total_scheduler_runs": 7, "successful_runs": 6, "failed_runs": 1},
+        "scheduler": {
+            "total_scheduler_runs": 7,
+            "failed_scheduler_runs": 1,
+            "total_reminders_sent": 30,
+            "total_reminders_failed": 3,
+        },
     }
 
 
@@ -57,9 +66,12 @@ def test_overview_success():
 
     data = response.json()
     assert data["contracts"]["total_contracts"] == 5
+    assert data["payments"]["payment_transaction_count"] == 12
+    assert data["payments"]["total_amount_received"] == "240.00" or data["payments"]["total_amount_received"] == "240"
     assert data["payments"]["pending_approval_count"] == 2
     assert data["agents"]["completed_runs"] == 18
-    assert data["scheduler"]["successful_runs"] == 6
+    assert data["scheduler"]["total_reminders_sent"] == 30
+    assert data["scheduler"]["total_reminders_failed"] == 3
 
 
 def test_overview_failure_returns_500():
