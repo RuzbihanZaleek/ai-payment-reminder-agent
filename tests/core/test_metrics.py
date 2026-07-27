@@ -10,6 +10,9 @@ from app.core.metrics import (
     record_workflow,
     record_payment_processed,
     record_reminder,
+    record_notification_processed,
+    record_notification_failed,
+    record_notification_retry,
 )
 from app.api.health import router as health_router
 
@@ -57,6 +60,11 @@ def test_domain_recorders_increment_global_registry():
     record_reminder(sent=True)
     record_reminder(sent=False)
 
+    record_notification_processed()
+    record_notification_failed()
+    record_notification_retry()
+    record_notification_retry()
+
     snap = metrics.snapshot()
     assert snap["counters"]["api_requests_total"] == 1
     assert snap["counters"]["agent_workflow_executions_total"] == 1
@@ -64,6 +72,9 @@ def test_domain_recorders_increment_global_registry():
     assert snap["counters"]["payments_processed_total"] == 1
     assert snap["counters"]["reminders_sent_total"] == 1
     assert snap["counters"]["reminders_failed_total"] == 1
+    assert snap["counters"]["notification_outbox_processed_total"] == 1
+    assert snap["counters"]["notification_outbox_failed_total"] == 1
+    assert snap["counters"]["notification_outbox_retry_total"] == 2
 
 
 def test_metrics_endpoint_returns_text():

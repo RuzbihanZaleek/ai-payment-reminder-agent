@@ -455,6 +455,34 @@ def create_notification_outbox_service(
     return NotificationOutboxService(NotificationOutboxRepository(db))
 
 
+def create_notification_worker(
+    db=None,
+):
+    """Compose the notification outbox worker (drains PENDING notifications)."""
+
+    from app.workers.notification_worker import NotificationWorker
+
+    if db is None:
+        db = SessionLocal()
+
+    notification_service = WhatsAppNotificationService(
+        access_token=settings.WHATSAPP_ACCESS_TOKEN,
+        phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
+        api_version=settings.WHATSAPP_API_VERSION,
+        max_retries=settings.WHATSAPP_MAX_RETRIES,
+        retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
+        timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
+    )
+
+    return NotificationWorker(
+        NotificationOutboxRepository(db),
+        notification_service,
+        max_retries=settings.NOTIFICATION_MAX_RETRIES,
+        retry_base_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
+        batch_size=settings.NOTIFICATION_WORKER_BATCH_SIZE,
+    )
+
+
 def create_audit_service(
     db=None,
 ) -> AuditService:

@@ -12,15 +12,22 @@ from app.models.base import Base
 
 
 class NotificationOutbox(Base):
-    """A durable, pending outbound notification.
+    """A durable outbound notification processed by the notification worker.
 
-    In "outbox" mode the workflow records one of these instead of calling the
-    WhatsApp API inline; an out-of-band relay would later read PENDING rows and
-    deliver them, flipping status to SENT/FAILED. This decouples delivery from
-    workflow execution so a transient provider outage never fails the workflow.
+    Lifecycle: ``PENDING`` -> ``PROCESSING`` -> ``SENT`` (success) or back to
+    ``PENDING`` (retry, with ``available_at`` pushed into the future) or
+    ``FAILED`` (after the retry budget is exhausted). The worker only becomes
+    eligible to pick a row up once ``available_at <= now`` and it is ``PENDING``,
+    which is how exponential backoff between retries is enforced.
     """
 
     __tablename__ = "notification_outbox"
+
+    # Status values.
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    SENT = "SENT"
+    FAILED = "FAILED"
 
     id = Column( Integer, primary_key=True )
 
@@ -34,8 +41,25 @@ class NotificationOutbox(Base):
 
     message = Column( Text, nullable=False )
 
-    # PENDING -> SENT | FAILED
     status = Column( String(20), nullable=False, server_default="PENDING", index=True )
+
+    # Number of delivery attempts made so far.
+    attempt_count = Column( Integer, nullable=False, server_default="0" )
+
+    # Last delivery error (for troubleshooting); never contains secrets.
+    last_error = Column( Text, nullable=True )
+
+    # When the message was successfully delivered.
+    sent_at = Column( DateTime(timezone=True), nullable=True )
+
+    # Earliest time the worker may (re)attempt this message -- drives backoff and
+    # oldest-first ordering.
+    available_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
 
     created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )
 

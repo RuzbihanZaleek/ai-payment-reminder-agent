@@ -73,9 +73,18 @@ class Settings(BaseSettings):
 
     # --- Notifications ------------------------------------------------------
     # "direct" sends inline during the workflow (current behavior);
-    # "outbox" records a PENDING NotificationOutbox row instead (a relay would
-    # send it out-of-band). Default preserves existing behavior.
+    # "outbox" records a PENDING NotificationOutbox row instead, delivered
+    # out-of-band by the notification worker. Default preserves existing behavior.
     NOTIFICATION_MODE: str = "direct"
+
+    # Background notification worker (drains the outbox).
+    NOTIFICATION_WORKER_ENABLED: bool = True
+    NOTIFICATION_WORKER_INTERVAL_SECONDS: int = 60
+    NOTIFICATION_MAX_RETRIES: int = 3
+    NOTIFICATION_WORKER_BATCH_SIZE: int = 50
+    # Advisory-lock key so only one replica's worker runs at a time (distinct
+    # from the reminder scheduler's lock).
+    NOTIFICATION_WORKER_LOCK_ID: int = 902_025_106
 
     # --- Rate limiting ------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = True

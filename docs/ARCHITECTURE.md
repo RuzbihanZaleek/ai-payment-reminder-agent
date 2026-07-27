@@ -205,6 +205,42 @@ Components:
 - **Audit trail** — `audit_logs` records who did what (logins, approvals,
   contract creation) for troubleshooting and compliance.
 
+## Notification delivery (direct vs outbox)
+
+```
+direct  (NOTIFICATION_MODE=direct, default):
+    workflow ──▶ NotificationService ──▶ WhatsApp        (inline, with retry)
+
+outbox  (NOTIFICATION_MODE=outbox):
+    workflow ──▶ notification_outbox (PENDING) ──▶ [returns immediately]
+                                │
+        notification worker (scheduler job, every N s, advisory-locked)
+                                │  get_pending(limit) WHERE available_at <= now
+                                ▼  ORDER BY available_at ASC
+                        mark PROCESSING
+                        NotificationService.send()
+                          ├─ success ─▶ mark SENT (sent_at)
+                          ├─ fail & attempts < MAX ─▶ PENDING, available_at = now + backoff
+                          └─ fail & attempts >= MAX ─▶ mark FAILED (last_error)
+```
+
+Outbox state machine: `PENDING → PROCESSING → SENT` | `PENDING` (retry, backoff
+via `available_at`) | `FAILED` (retry budget exhausted). Only `PENDING` rows
+whose `available_at` has passed are eligible, so backoff is enforced purely by a
+future `available_at`. Ordering is oldest-first.
+
+## Worker lifecycle & duplicate prevention
+
+The notification worker is a **separate** scheduler job from the daily reminder
+job (own id `process_notification_outbox`, own `IntervalTrigger`, own advisory
+lock `NOTIFICATION_WORKER_LOCK_ID`). Every replica schedules it, but each run
+first tries `pg_try_advisory_lock(NOTIFICATION_WORKER_LOCK_ID)`; only the winner
+processes a batch, the rest log `notification_worker_skipped_locked` and return.
+The lock (and its session) is released in a `finally` block. This keeps
+background processing off the API request path and safe across replicas without
+Redis or a separate process — though the worker can also be run as a dedicated
+replica (`SCHEDULER_ENABLED=true` there, `false` on web replicas) if desired.
+
 ## Database indexes
 
 `alembic/versions/e6f7a8b9c0d1_add_performance_indexes.py` adds indexes on the

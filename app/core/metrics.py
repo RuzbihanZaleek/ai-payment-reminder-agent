@@ -103,3 +103,24 @@ def record_reminder(sent: bool) -> None:
         metrics.inc("reminders_sent_total", help="Reminders sent")
     else:
         metrics.inc("reminders_failed_total", help="Reminders failed")
+
+
+def record_notification_processed() -> None:
+    metrics.inc(
+        "notification_outbox_processed_total",
+        help="Outbox notifications delivered successfully",
+    )
+
+
+def record_notification_failed() -> None:
+    metrics.inc(
+        "notification_outbox_failed_total",
+        help="Outbox notifications permanently failed",
+    )
+
+
+def record_notification_retry() -> None:
+    metrics.inc(
+        "notification_outbox_retry_total",
+        help="Outbox notification delivery retries scheduled",
+    )

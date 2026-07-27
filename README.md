@@ -386,6 +386,11 @@ See [`.env.example`](.env.example). Summary:
 | `WHATSAPP_RETRY_DELAY_SECONDS` | no | `2` | base for exponential backoff |
 | `WHATSAPP_TIMEOUT_SECONDS` | no | `10` | per-request timeout |
 | `NOTIFICATION_MODE` | no | `direct` | `direct` or `outbox` |
+| `NOTIFICATION_WORKER_ENABLED` | no | `true` | run the outbox delivery worker |
+| `NOTIFICATION_WORKER_INTERVAL_SECONDS` | no | `60` | how often the worker runs |
+| `NOTIFICATION_MAX_RETRIES` | no | `3` | attempts before a notification is FAILED |
+| `NOTIFICATION_WORKER_BATCH_SIZE` | no | `50` | notifications per worker pass |
+| `NOTIFICATION_WORKER_LOCK_ID` | no | `902025106` | PG advisory-lock key (one worker runs) |
 | `RATE_LIMIT_ENABLED` | no | `true` | |
 | `RATE_LIMIT_LOGIN_PER_MINUTE` | no | `5` | per IP |
 | `RATE_LIMIT_REGISTER_PER_MINUTE` | no | `5` | per IP |
@@ -424,10 +429,15 @@ without touching routers. It is disabled under `APP_ENV=testing`.
   (`retry_policy.py`), never retries client errors (400/401/403), logs each
   `whatsapp_retry_attempt`, and still returns `False` on final failure (delivery
   never breaks the workflow).
-- **Notification outbox** — set `NOTIFICATION_MODE=outbox` to have the workflow
-  persist a `PENDING` `NotificationOutbox` row instead of sending inline; an
-  out-of-band relay delivers it, so a provider outage can't fail a run. Default
-  `direct` preserves the original inline behavior.
+- **Notification outbox + worker** — two delivery modes:
+  - `direct` (default): `workflow → WhatsApp` inline.
+  - `outbox`: `workflow → database → worker → WhatsApp`. The workflow persists a
+    `PENDING` `NotificationOutbox` row and returns; the **notification worker**
+    (a separate scheduler job, default every 60s, guarded by its own advisory
+    lock) drains due rows oldest-first, sends each, and marks them `SENT`, or
+    reschedules with exponential backoff (`available_at`), or marks `FAILED`
+    after `NOTIFICATION_MAX_RETRIES`. Delivery survives restarts and a provider
+    outage never fails a run. One failed message never blocks the rest.
 - **Metrics** — `GET /metrics` exposes Prometheus-format counters/summaries
   (API requests + duration, workflow executions/failures/duration, payments
   processed, approval requests, reminders sent/failed). Process-local; a

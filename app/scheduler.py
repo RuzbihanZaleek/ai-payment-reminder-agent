@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.config import settings
 from app.core.logger import get_logger, set_request_id
@@ -14,6 +15,7 @@ from app.container import (
     create_reminder_execution_service,
     create_scheduler_run_repository,
     create_scheduler_event_repository,
+    create_notification_worker,
 )
 from app.enums.scheduler_run_status import SchedulerRunStatus
 from app.models.scheduler_run import SchedulerRun
@@ -23,6 +25,7 @@ from app.models.scheduler_event import SchedulerEvent
 logger = get_logger(__name__)
 
 _JOB_ID = "send_daily_reminders"
+_NOTIFICATION_JOB_ID = "process_notification_outbox"
 
 
 def _open_scheduler_lock():
@@ -183,6 +186,50 @@ def _execute_daily_reminders():
         raise
 
 
+def _open_notification_worker_lock():
+    """Open a dedicated session + advisory-lock service for the worker.
+
+    Uses a distinct lock id from the reminder scheduler so the two never
+    contend, and is overridable in tests.
+    """
+
+    session = SessionLocal()
+    return (
+        SchedulerLockService(session, settings.NOTIFICATION_WORKER_LOCK_ID),
+        session,
+    )
+
+
+def process_notification_outbox():
+    """Drain the notification outbox once, guarded by an advisory lock.
+
+    Separate from the reminder job (own lock, own schedule). Only one replica's
+    worker runs at a time; the rest log ``notification_worker_skipped_locked``.
+    """
+
+    lock_service, lock_session = _open_notification_worker_lock()
+
+    try:
+        if not lock_service.acquire():
+            logger.info(
+                "notification_worker_skipped_locked",
+                extra={"lock_id": settings.NOTIFICATION_WORKER_LOCK_ID},
+            )
+            return
+
+        set_request_id(f"notification-worker-{uuid.uuid4().hex}")
+
+        worker_session = SessionLocal()
+        try:
+            worker = create_notification_worker(db=worker_session)
+            worker.process_batch()
+        finally:
+            worker_session.close()
+    finally:
+        lock_service.release()
+        lock_session.close()
+
+
 def create_scheduler() -> BackgroundScheduler:
     """Build a scheduler with the daily reminder job registered.
 
@@ -208,6 +255,20 @@ def create_scheduler() -> BackgroundScheduler:
         coalesce=True,
         misfire_grace_time=settings.SCHEDULER_MISFIRE_GRACE_TIME,
     )
+
+    # Independent, higher-frequency job draining the notification outbox. Kept
+    # separate from the reminder job (own id, own lock, own schedule).
+    if settings.NOTIFICATION_WORKER_ENABLED:
+        scheduler.add_job(
+            process_notification_outbox,
+            trigger=IntervalTrigger(
+                seconds=settings.NOTIFICATION_WORKER_INTERVAL_SECONDS,
+            ),
+            id=_NOTIFICATION_JOB_ID,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
 
     return scheduler
 
