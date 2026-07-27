@@ -17,11 +17,11 @@ class PaymentReceipt(Base):
 
     id = Column( Integer, primary_key=True )
 
-    agent_run_id = Column( Integer, ForeignKey("agent_runs.id"), nullable=False )
+    agent_run_id = Column( Integer, ForeignKey("agent_runs.id"), nullable=False, index=True )
 
-    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False )
+    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False, index=True )
 
-    payment_id = Column( Integer, ForeignKey("payments.id"), nullable=False )
+    payment_id = Column( Integer, ForeignKey("payments.id"), nullable=False, index=True )
 
     amount = Column( Numeric(10, 2), nullable=False )
 

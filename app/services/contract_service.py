@@ -1,4 +1,4 @@
-from app.models.contract import Contract
+from app.models.contract import Contract, ContractStatus
 from app.schemas.contract import ContractCreate
 from app.repositories.contract_repository import ContractRepository
 
@@ -51,10 +51,11 @@ class ContractService:
 
     def get_user_contracts(
         self,
-        user_id: int
+        user_id: int,
+        status: ContractStatus | None = None,
     ) -> list[Contract]:
 
-        return self.repository.get_all_for_user(user_id)
+        return self.repository.get_all_for_user(user_id, status)
 
 
     def delete_contract(

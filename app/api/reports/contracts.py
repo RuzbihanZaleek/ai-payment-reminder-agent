@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import SessionLocal
@@ -16,6 +16,10 @@ from app.container import (
 from app.services.contract_reporting_service import ContractReportingService
 from app.services.payment_reporting_service import PaymentReportingService
 from app.services.receipt_reporting_service import ReceiptReportingService
+from app.core.errors import NotFoundError, ErrorCode
+from app.schemas.pagination import Page, PaginationParams
+from app.repositories.filters import PaymentFilter
+from app.api.query_params import payment_filter_params
 from app.api.deps import require_owned_contract
 
 
@@ -101,26 +105,44 @@ def get_contract_summary(
     summary = service.get_contract_summary(contract_id, contract.user_id)
 
     if summary is None:
-        raise HTTPException(status_code=404, detail="Contract not found")
+        raise NotFoundError("Contract not found.", code=ErrorCode.CONTRACT_NOT_FOUND)
 
     return summary
 
 
-@router.get("/{contract_id}/payments", response_model=list[PaymentReportResponse])
+@router.get("/{contract_id}/payments", response_model=Page[PaymentReportResponse])
 def get_contract_payments(
     contract_id: int,
     contract=Depends(require_owned_contract),
+    pagination: PaginationParams = Depends(),
+    payment_filter: PaymentFilter = Depends(payment_filter_params),
     service: PaymentReportingService = Depends(get_payment_reporting_service),
 ):
 
-    return service.get_payment_history(contract_id)
+    result = service.get_payment_history(
+        contract_id,
+        payment_filter,
+        pagination.page,
+        pagination.page_size,
+        pagination.order,
+    )
+
+    return Page.build(result, pagination.page, pagination.page_size)
 
 
-@router.get("/{contract_id}/receipts", response_model=list[ReceiptReportResponse])
+@router.get("/{contract_id}/receipts", response_model=Page[ReceiptReportResponse])
 def get_contract_receipts(
     contract_id: int,
     contract=Depends(require_owned_contract),
+    pagination: PaginationParams = Depends(),
     service: ReceiptReportingService = Depends(get_receipt_reporting_service),
 ):
 
-    return service.get_receipt_history(contract_id)
+    result = service.get_receipt_history(
+        contract_id,
+        pagination.page,
+        pagination.page_size,
+        pagination.order,
+    )
+
+    return Page.build(result, pagination.page, pagination.page_size)

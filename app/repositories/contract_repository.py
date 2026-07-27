@@ -61,15 +61,25 @@ class ContractRepository:
         )
 
 
-    def get_all_for_user(self, user_id: int) -> list[Contract]:
+    def get_all_for_user(
+        self,
+        user_id: int,
+        status: ContractStatus | None = None,
+    ) -> list[Contract]:
 
-        return (
+        query = (
             self.db.query(Contract)
             .filter(
                 Contract.user_id == user_id
             )
-            .all()
         )
+
+        # Optional status filter -- callers that omit it (reporting/dashboard)
+        # keep the original "all of the user's contracts" behavior.
+        if status is not None:
+            query = query.filter(Contract.status == status)
+
+        return query.all()
 
 
     def get_active_by_whatsapp_chat_id(

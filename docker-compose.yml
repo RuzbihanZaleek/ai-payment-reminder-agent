@@ -9,14 +9,20 @@ services:
     ports:
       - "8000:8000"
 
+    # Dev convenience: live-reload the source. Remove this mount for a true
+    # production deployment so the image is the single source of truth.
     volumes:
       - .:/app
 
     env_file:
       - .env
 
+    # Only start the API once the database is actually accepting connections.
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
 
 
   postgres:
@@ -34,6 +40,15 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_reminder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    restart: unless-stopped
 
 
 volumes:

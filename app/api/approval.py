@@ -1,11 +1,14 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import SessionLocal
 from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
+from app.core.errors import NotFoundError, ErrorCode
+from app.schemas.pagination import Page, PaginationParams
+from app.api.query_params import approval_status_param
 from app.container import create_payment_approval_service
 from app.services.payment_approval_service import PaymentApprovalService
 from app.api.deps import get_current_user
@@ -41,13 +44,24 @@ def get_payment_approval_service():
         db.close()
 
 
-@router.get("/pending", response_model=list[ApprovalResponse])
+@router.get("/pending", response_model=Page[ApprovalResponse])
 def list_pending_approvals(
     current_user: User = Depends(get_current_user),
+    approval_status: ApprovalStatus = Depends(approval_status_param),
+    pagination: PaginationParams = Depends(),
     service: PaymentApprovalService = Depends(get_payment_approval_service),
 ):
+    # Defaults to PENDING (preserving the endpoint's original meaning); an
+    # optional ?status= lets a reviewer page through approved/rejected too.
+    result = service.get_approvals_page(
+        current_user.id,
+        approval_status,
+        pagination.page,
+        pagination.page_size,
+        pagination.order,
+    )
 
-    return service.get_pending_approvals(current_user.id)
+    return Page.build(result, pagination.page, pagination.page_size)
 
 
 @router.post("/{payment_id}/approve", response_model=ApprovalResponse)
@@ -65,7 +79,7 @@ def approve_payment(
     )
 
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise NotFoundError("Payment not found.", code=ErrorCode.PAYMENT_NOT_FOUND)
 
     return payment
 
@@ -85,6 +99,6 @@ def reject_payment(
     )
 
     if payment is None:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise NotFoundError("Payment not found.", code=ErrorCode.PAYMENT_NOT_FOUND)
 
     return payment

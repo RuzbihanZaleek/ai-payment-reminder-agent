@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 
+from app.core.logger import get_logger
 from app.models.payment import Payment
 from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.contract_repository import ContractRepository
+
+
+logger = get_logger(__name__)
 
 
 class PaymentApprovalService:
@@ -34,6 +38,24 @@ class PaymentApprovalService:
 
         return [p for p in pending if self._is_owned_by(p, user_id)]
 
+    def get_approvals_page(
+        self,
+        user_id: int,
+        approval_status: ApprovalStatus,
+        page: int,
+        page_size: int,
+        order,
+    ):
+        # Ownership scoping + pagination happen in a single DB query (join on the
+        # owning contract), so the count and page are consistent.
+        return self.payment_repository.get_by_approval_status_for_user_page(
+            user_id,
+            approval_status,
+            page,
+            page_size,
+            order,
+        )
+
     def approve_payment(
         self,
         payment_id: int,
@@ -50,6 +72,15 @@ class PaymentApprovalService:
         payment.approval_status = ApprovalStatus.APPROVED
         payment.approved_by = approved_by
         payment.approved_at = datetime.now(timezone.utc)
+
+        logger.info(
+            "payment_approved",
+            extra={
+                "payment_id": payment_id,
+                "user_id": user_id,
+                "reviewed_by": approved_by,
+            },
+        )
 
         return self.payment_repository.update(payment)
 
@@ -69,5 +100,14 @@ class PaymentApprovalService:
         # become REJECTED so the payment never affects the balance.
         payment.approval_status = ApprovalStatus.REJECTED
         payment.status = PaymentStatus.REJECTED
+
+        logger.info(
+            "payment_rejected",
+            extra={
+                "payment_id": payment_id,
+                "user_id": user_id,
+                "reviewed_by": rejected_by,
+            },
+        )
 
         return self.payment_repository.update(payment)

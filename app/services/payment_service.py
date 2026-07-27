@@ -72,6 +72,24 @@ class PaymentService:
     
     def get_contract_payments( self, contract_id: int ) -> list[Payment]:
         return self.repository.get_by_contract_id(contract_id)
+
+    def get_contract_payments_page(
+        self,
+        contract_id: int,
+        payment_filter,
+        page: int,
+        page_size: int,
+        order,
+    ):
+        # Pagination/filtering/ordering are owned by the repository; the service
+        # just forwards the request.
+        return self.repository.get_by_contract_id_page(
+            contract_id,
+            payment_filter,
+            page,
+            page_size,
+            order,
+        )
     
     def calculate_total_paid( self, contract_id: int) -> Decimal:
         payments = self.get_contract_payments(contract_id)

@@ -6,6 +6,7 @@ alembic
 python-dotenv
 pydantic
 pydantic-settings
+email-validator
 pytest
 langchain>=0.3
 langchain-openai>=0.3

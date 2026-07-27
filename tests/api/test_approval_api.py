@@ -10,6 +10,7 @@ from app.api.deps import get_current_user
 from app.models.payment import Payment
 from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
+from app.repositories.pagination import PageResult
 
 
 client = TestClient(app)
@@ -22,10 +23,13 @@ class FakeApprovalService:
         self.payment = payment
         self.approved = []
         self.rejected = []
+        self.approvals_calls = []
 
-    def get_pending_approvals(self, user_id):
+    def get_approvals_page(self, user_id, approval_status, page, page_size, order):
 
-        return self.pending
+        self.approvals_calls.append((user_id, approval_status, page, page_size, order))
+
+        return PageResult(items=self.pending, total=len(self.pending))
 
     def approve_payment(self, payment_id, approved_by, user_id):
 
@@ -75,9 +79,10 @@ def test_list_pending_approvals(override_service):
 
     data = response.json()
 
-    assert len(data) == 1
-    assert data[0]["id"] == 1
-    assert data[0]["approval_status"] == "PENDING"
+    assert data["meta"]["total_items"] == 1
+    assert len(data["items"]) == 1
+    assert data["items"][0]["id"] == 1
+    assert data["items"][0]["approval_status"] == "PENDING"
 
 
 def test_approve_changes_status(override_service):

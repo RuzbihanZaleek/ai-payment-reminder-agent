@@ -16,9 +16,9 @@ class ReminderLog(Base):
 
     id = Column( Integer, primary_key=True )
 
-    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False )
+    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False, index=True )
 
-    sent_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )
+    sent_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False, index=True )
 
     message = Column( String(500), nullable=True )
 

@@ -1,5 +1,7 @@
-from app.models.payment import Payment
 from app.services.payment_service import PaymentService
+from app.repositories.filters import PaymentFilter
+from app.repositories.pagination import PageResult
+from app.enums.sort_order import SortOrder
 
 
 class PaymentReportingService:
@@ -10,9 +12,22 @@ class PaymentReportingService:
     ):
         self.payment_service = payment_service
 
-    def get_payment_history(self, contract_id: int) -> list[Payment]:
+    def get_payment_history(
+        self,
+        contract_id: int,
+        payment_filter: PaymentFilter,
+        page: int,
+        page_size: int,
+        order: SortOrder,
+    ) -> PageResult:
 
-        return self.payment_service.get_contract_payments(contract_id)
+        return self.payment_service.get_contract_payments_page(
+            contract_id,
+            payment_filter,
+            page,
+            page_size,
+            order,
+        )
 
     def get_payment_stats(self, user_id: int) -> dict:
 

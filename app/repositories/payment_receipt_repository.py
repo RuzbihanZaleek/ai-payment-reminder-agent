@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.models.payment_receipt import PaymentReceipt
+from app.repositories.pagination import PageResult, apply_ordering, paginate
+from app.enums.sort_order import SortOrder
 
 
 class PaymentReceiptRepository:
@@ -35,3 +37,18 @@ class PaymentReceiptRepository:
             .filter(PaymentReceipt.contract_id == contract_id)
             .all()
         )
+
+    def get_by_contract_id_page(
+        self,
+        contract_id: int,
+        page: int,
+        page_size: int,
+        order: SortOrder,
+    ) -> PageResult:
+        query = (
+            self.db.query(PaymentReceipt)
+            .filter(PaymentReceipt.contract_id == contract_id)
+        )
+        query = apply_ordering(query, PaymentReceipt.id, order)
+
+        return paginate(query, page, page_size)

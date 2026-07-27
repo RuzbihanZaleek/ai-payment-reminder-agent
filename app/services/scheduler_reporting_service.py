@@ -1,7 +1,9 @@
-from app.models.scheduler_run import SchedulerRun
 from app.enums.scheduler_run_status import SchedulerRunStatus
 from app.repositories.scheduler_run_repository import SchedulerRunRepository
 from app.repositories.scheduler_event_repository import SchedulerEventRepository
+from app.repositories.filters import SchedulerRunFilter
+from app.repositories.pagination import PageResult
+from app.enums.sort_order import SortOrder
 
 
 class SchedulerReportingService:
@@ -14,9 +16,20 @@ class SchedulerReportingService:
         self.scheduler_run_repository = scheduler_run_repository
         self.scheduler_event_repository = scheduler_event_repository
 
-    def get_recent_runs(self, limit: int = 20) -> list[SchedulerRun]:
+    def get_recent_runs(
+        self,
+        run_filter: SchedulerRunFilter,
+        page: int,
+        page_size: int,
+        order: SortOrder,
+    ) -> PageResult:
 
-        return self.scheduler_run_repository.get_recent(limit)
+        return self.scheduler_run_repository.get_page(
+            run_filter,
+            page,
+            page_size,
+            order,
+        )
 
     def get_run_details(self, run_id: int) -> dict | None:
 

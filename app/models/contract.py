@@ -24,6 +24,7 @@ class Contract(Base, IdMixin, TimestampMixin):
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"),
         nullable=True,
+        index=True,
     )
 
     reference_code: Mapped[str] = mapped_column(
@@ -63,11 +64,13 @@ class Contract(Base, IdMixin, TimestampMixin):
         SqlEnum(ContractStatus),
         default=ContractStatus.ACTIVE,
         nullable=False,
+        index=True,
     )
 
     whatsapp_chat_id: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+        index=True,
     )
     
     payments = relationship(

@@ -18,14 +18,14 @@ class AgentRun(Base):
 
     id = Column( Integer, primary_key=True )
 
-    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False )
+    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False, index=True )
 
     message_id = Column( String(255), nullable=False )
 
-    status = Column( Enum(AgentRunStatus), nullable=False, default=AgentRunStatus.PENDING )
+    status = Column( Enum(AgentRunStatus), nullable=False, default=AgentRunStatus.PENDING, index=True )
 
     current_step = Column( String(100), nullable=True )
 
-    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )
+    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False, index=True )
 
     completed_at = Column( DateTime(timezone=True), nullable=True )

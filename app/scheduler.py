@@ -1,9 +1,9 @@
-import logging
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.core.logger import get_logger, set_request_id
 from app.container import (
     create_reminder_service,
     create_reminder_execution_service,
@@ -15,7 +15,7 @@ from app.models.scheduler_run import SchedulerRun
 from app.models.scheduler_event import SchedulerEvent
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def send_daily_reminders():
@@ -40,6 +40,12 @@ def send_daily_reminders():
                 status=SchedulerRunStatus.RUNNING,
             )
         )
+
+        # Correlate every log line emitted during this background run (there is
+        # no HTTP request to carry a request id).
+        set_request_id(f"scheduler-run-{scheduler_run.id}")
+
+        logger.info("scheduler_run_started", extra={"scheduler_run_id": scheduler_run.id})
 
         contracts = reminder_service.get_pending_reminders()
 
@@ -84,6 +90,16 @@ def send_daily_reminders():
         scheduler_run.completed_at = datetime.now(timezone.utc)
 
         run_repository.update_status(scheduler_run, SchedulerRunStatus.COMPLETED)
+
+        logger.info(
+            "scheduler_run_completed",
+            extra={
+                "scheduler_run_id": scheduler_run.id,
+                "total_contracts": len(contracts),
+                "successful_count": successful_count,
+                "failed_count": failed_count,
+            },
+        )
 
     except Exception:
         # A top-level failure (e.g. fetching contracts, or a repository error)

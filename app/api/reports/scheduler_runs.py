@@ -1,10 +1,14 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import SessionLocal
 from app.enums.scheduler_run_status import SchedulerRunStatus
+from app.core.errors import NotFoundError, ErrorCode
+from app.schemas.pagination import Page, PaginationParams
+from app.repositories.filters import SchedulerRunFilter
+from app.api.query_params import scheduler_run_filter_params
 from app.container import create_scheduler_reporting_service
 from app.services.scheduler_reporting_service import SchedulerReportingService
 from app.api.deps import get_current_user
@@ -59,12 +63,21 @@ def get_scheduler_reporting_service():
         db.close()
 
 
-@router.get("", response_model=list[SchedulerRunResponse])
+@router.get("", response_model=Page[SchedulerRunResponse])
 def list_scheduler_runs(
+    pagination: PaginationParams = Depends(),
+    run_filter: SchedulerRunFilter = Depends(scheduler_run_filter_params),
     service: SchedulerReportingService = Depends(get_scheduler_reporting_service),
 ):
 
-    return service.get_recent_runs()
+    result = service.get_recent_runs(
+        run_filter,
+        pagination.page,
+        pagination.page_size,
+        pagination.order,
+    )
+
+    return Page.build(result, pagination.page, pagination.page_size)
 
 
 @router.get("/{run_id}", response_model=SchedulerRunDetailResponse)
@@ -76,6 +89,9 @@ def get_scheduler_run(
     details = service.get_run_details(run_id)
 
     if details is None:
-        raise HTTPException(status_code=404, detail="Scheduler run not found")
+        raise NotFoundError(
+            "Scheduler run not found.",
+            code=ErrorCode.SCHEDULER_RUN_NOT_FOUND,
+        )
 
     return details

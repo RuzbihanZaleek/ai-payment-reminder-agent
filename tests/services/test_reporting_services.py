@@ -5,6 +5,9 @@ from app.services.payment_reporting_service import PaymentReportingService
 from app.services.receipt_reporting_service import ReceiptReportingService
 from app.services.agent_reporting_service import AgentReportingService
 from app.services.scheduler_reporting_service import SchedulerReportingService
+from app.repositories.pagination import PageResult
+from app.repositories.filters import PaymentFilter
+from app.enums.sort_order import SortOrder
 
 
 class FakeContract:
@@ -41,6 +44,9 @@ class FakePaymentService:
 
     def get_contract_payments(self, contract_id):
         return self.payments
+
+    def get_contract_payments_page(self, contract_id, payment_filter, page, page_size, order):
+        return PageResult(items=self.payments, total=len(self.payments))
 
     def calculate_total_paid(self, contract_id):
         return self._total_paid
@@ -94,7 +100,12 @@ def test_payment_history():
     payments = [object(), object()]
     service = PaymentReportingService(FakePaymentService(payments=payments))
 
-    assert service.get_payment_history(1) == payments
+    result = service.get_payment_history(
+        1, PaymentFilter(), page=1, page_size=20, order=SortOrder.DESC
+    )
+
+    assert result.items == payments
+    assert result.total == 2
 
 
 class FakeReceiptRepository:
@@ -105,13 +116,19 @@ class FakeReceiptRepository:
     def get_by_contract_id(self, contract_id):
         return self.receipts
 
+    def get_by_contract_id_page(self, contract_id, page, page_size, order):
+        return PageResult(items=self.receipts, total=len(self.receipts))
+
 
 def test_receipt_history():
 
     receipts = [object()]
     service = ReceiptReportingService(FakeReceiptRepository(receipts))
 
-    assert service.get_receipt_history(1) == receipts
+    result = service.get_receipt_history(1, page=1, page_size=20, order=SortOrder.DESC)
+
+    assert result.items == receipts
+    assert result.total == 1
 
 
 class FakeAgentRunRepository:

@@ -1,8 +1,9 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.db.session import SessionLocal
 from app.core.security import decode_access_token
+from app.core.errors import UnauthorizedError, NotFoundError, ErrorCode
 from app.container import create_auth_service
 from app.models.user import User
 from app.models.contract import Contract
@@ -18,12 +19,12 @@ def get_current_user(
     """Resolve the authenticated user from a Bearer JWT, or raise 401."""
 
     if credentials is None:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise UnauthorizedError("Not authenticated.")
 
     user_id = decode_access_token(credentials.credentials)
 
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise UnauthorizedError("Invalid or expired token.")
 
     db = SessionLocal()
 
@@ -33,7 +34,7 @@ def get_current_user(
         db.close()
 
     if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise UnauthorizedError("User not found.")
 
     return user
 
@@ -55,6 +56,6 @@ def require_owned_contract(
         db.close()
 
     if contract is None:
-        raise HTTPException(status_code=404, detail="Contract not found")
+        raise NotFoundError("Contract not found.", code=ErrorCode.CONTRACT_NOT_FOUND)
 
     return contract

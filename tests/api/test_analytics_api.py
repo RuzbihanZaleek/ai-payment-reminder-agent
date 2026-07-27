@@ -88,6 +88,10 @@ def test_overview_failure_returns_500():
         lambda: FakeAnalyticsService(exc=RuntimeError("boom"))
     )
 
-    response = client.get("/analytics/overview")
+    # The router no longer catches -- the global handler standardizes the 500.
+    safe_client = TestClient(app, raise_server_exceptions=False)
+
+    response = safe_client.get("/analytics/overview")
 
     assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"

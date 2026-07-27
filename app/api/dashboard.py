@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.db.session import SessionLocal
 from app.container import create_dashboard_service
@@ -29,11 +29,6 @@ def get_overview(
     current_user: User = Depends(get_current_user),
     service: DashboardService = Depends(get_dashboard_service),
 ):
-
-    try:
-        return service.get_overview(current_user.id)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to build dashboard overview",
-        ) from exc
+    # Any unexpected failure is standardized to a 500 envelope by the global
+    # exception handler -- no per-router try/except needed.
+    return service.get_overview(current_user.id)

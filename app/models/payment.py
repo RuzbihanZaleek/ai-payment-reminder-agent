@@ -24,15 +24,15 @@ class Payment(Base):
 
     id = Column( Integer, primary_key=True )
     
-    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False )
-    
-    amount = Column( Numeric(10,2), nullable=False )
-    
-    payment_date = Column( Date, nullable=False )
-    
-    status = Column( Enum(PaymentStatus), nullable=False, default=PaymentStatus.PENDING )
+    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False, index=True )
 
-    approval_status = Column( Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.PENDING )
+    amount = Column( Numeric(10,2), nullable=False )
+
+    payment_date = Column( Date, nullable=False, index=True )
+
+    status = Column( Enum(PaymentStatus), nullable=False, default=PaymentStatus.PENDING, index=True )
+
+    approval_status = Column( Enum(ApprovalStatus), nullable=False, default=ApprovalStatus.PENDING, index=True )
 
     requires_manual_review = Column( Boolean, nullable=False, default=False )
 
@@ -48,6 +48,6 @@ class Payment(Base):
     
     contract = relationship( "Contract", back_populates="payments" )
     
-    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )
-    
+    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False, index=True )
+
     updated_at = Column( DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False )

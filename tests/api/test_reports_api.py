@@ -14,9 +14,14 @@ from app.api.reports.contracts import (
 from app.api.reports.agent_runs import get_agent_reporting_service
 from app.api.reports.scheduler_runs import get_scheduler_reporting_service
 from app.api.deps import get_current_user, require_owned_contract
+from app.repositories.pagination import PageResult
 
 
 client = TestClient(app)
+
+
+def _page(items):
+    return PageResult(items=items, total=len(items))
 
 DT = datetime(2026, 7, 27, 12, 0, 0)
 D = date(2026, 7, 27)
@@ -92,13 +97,15 @@ def test_contract_payments_success():
         }
     ]
     app.dependency_overrides[get_payment_reporting_service] = (
-        lambda: _Svc("get_payment_history", payments)
+        lambda: _Svc("get_payment_history", _page(payments))
     )
 
     response = client.get("/reports/contracts/1/payments")
 
     assert response.status_code == 200
-    assert len(response.json()) == 1
+    body = response.json()
+    assert body["meta"]["total_items"] == 1
+    assert len(body["items"]) == 1
 
 
 # --- Receipt history --------------------------------------------------------
@@ -118,13 +125,14 @@ def test_contract_receipts_success():
         }
     ]
     app.dependency_overrides[get_receipt_reporting_service] = (
-        lambda: _Svc("get_receipt_history", receipts)
+        lambda: _Svc("get_receipt_history", _page(receipts))
     )
 
     response = client.get("/reports/contracts/1/receipts")
 
     assert response.status_code == 200
-    assert response.json()[0]["new_balance"] == "880.00" or response.json()[0]["new_balance"] == "880"
+    items = response.json()["items"]
+    assert items[0]["new_balance"] == "880.00" or items[0]["new_balance"] == "880"
 
 
 # --- Agent runs -------------------------------------------------------------
@@ -144,15 +152,15 @@ def _agent_run():
 def test_agent_runs_list_success():
 
     class FakeAgentSvc:
-        def get_recent_runs(self, limit=20):
-            return [_agent_run()]
+        def get_recent_runs(self, user_id, run_filter, page, page_size, order):
+            return _page([_agent_run()])
 
     app.dependency_overrides[get_agent_reporting_service] = lambda: FakeAgentSvc()
 
     response = client.get("/reports/agent-runs")
 
     assert response.status_code == 200
-    assert response.json()[0]["id"] == 3
+    assert response.json()["items"][0]["id"] == 3
 
 
 def test_agent_run_detail_success():
@@ -212,15 +220,15 @@ def _scheduler_run():
 def test_scheduler_runs_list_success():
 
     class FakeSchedSvc:
-        def get_recent_runs(self, limit=20):
-            return [_scheduler_run()]
+        def get_recent_runs(self, run_filter, page, page_size, order):
+            return _page([_scheduler_run()])
 
     app.dependency_overrides[get_scheduler_reporting_service] = lambda: FakeSchedSvc()
 
     response = client.get("/reports/scheduler-runs")
 
     assert response.status_code == 200
-    assert response.json()[0]["run_type"] == "daily_reminders"
+    assert response.json()["items"][0]["run_type"] == "daily_reminders"
 
 
 def test_scheduler_run_detail_success():

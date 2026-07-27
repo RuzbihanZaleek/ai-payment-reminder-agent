@@ -3,6 +3,8 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 
 from app.core.logger import get_logger, set_request_id
+from app.core.errors import register_exception_handlers
+from app.api.health import router as health_router
 from app.api.auth import router as auth_router
 from app.api.agent import router as agent_router
 from app.api.whatsapp import router as whatsapp_router
@@ -19,6 +21,8 @@ app = FastAPI(
     title="AI Payment Reminder Agent"
 )
 
+register_exception_handlers(app)
+
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
@@ -34,6 +38,7 @@ async def request_id_middleware(request: Request, call_next):
     return response
 
 
+app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(agent_router)
 app.include_router(whatsapp_router)
@@ -46,7 +51,7 @@ app.include_router(analytics_router)
 
 
 @app.get("/")
-def health():
+def root():
     return {
         "status": "running"
     }

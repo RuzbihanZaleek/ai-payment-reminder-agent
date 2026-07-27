@@ -41,23 +41,49 @@ def test_register_success():
 
     response = client.post(
         "/auth/register",
-        json={"email": "a@b.com", "password": "pw"},
+        json={"email": "a@b.com", "password": "password123"},
     )
 
     assert response.status_code == 201
     assert response.json()["email"] == "a@b.com"
 
 
-def test_register_duplicate_returns_400():
+def test_register_short_password_returns_422():
+
+    app.dependency_overrides[get_auth_service] = lambda: FakeAuthService()
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "a@b.com", "password": "short"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_register_invalid_email_returns_422():
+
+    app.dependency_overrides[get_auth_service] = lambda: FakeAuthService()
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "not-an-email", "password": "password123"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_duplicate_returns_409():
 
     app.dependency_overrides[get_auth_service] = lambda: FakeAuthService(exists=True)
 
     response = client.post(
         "/auth/register",
-        json={"email": "a@b.com", "password": "pw"},
+        json={"email": "a@b.com", "password": "password123"},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "EMAIL_ALREADY_REGISTERED"
 
 
 def test_login_success_returns_token():

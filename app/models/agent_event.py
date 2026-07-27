@@ -18,7 +18,7 @@ class AgentEvent(Base):
 
     id = Column( Integer, primary_key=True )
 
-    agent_run_id = Column( Integer, ForeignKey("agent_runs.id"), nullable=False )
+    agent_run_id = Column( Integer, ForeignKey("agent_runs.id"), nullable=False, index=True )
 
     node_name = Column( String(100), nullable=False )
 
@@ -28,4 +28,4 @@ class AgentEvent(Base):
 
     duration_ms = Column( Integer, nullable=True )
 
-    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False )
+    created_at = Column( DateTime(timezone=True), server_default=func.now(), nullable=False, index=True )

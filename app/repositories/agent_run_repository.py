@@ -1,6 +1,11 @@
+from datetime import timedelta
+
 from sqlalchemy.orm import Session
 
 from app.models.agent_run import AgentRun
+from app.repositories.filters import AgentRunFilter
+from app.repositories.pagination import PageResult, apply_ordering, paginate
+from app.enums.sort_order import SortOrder
 
 
 class AgentRunRepository:
@@ -56,6 +61,33 @@ class AgentRunRepository:
             .filter(AgentRun.id == agent_run_id)
             .first()
         )
+
+    def get_for_user_page(
+        self,
+        user_id: int,
+        run_filter: AgentRunFilter,
+        page: int,
+        page_size: int,
+        order: SortOrder,
+    ) -> PageResult:
+        query = self._for_user_query(user_id)
+
+        if run_filter.status is not None:
+            query = query.filter(AgentRun.status == run_filter.status)
+
+        if run_filter.date_from is not None:
+            query = query.filter(AgentRun.created_at >= run_filter.date_from)
+
+        if run_filter.date_to is not None:
+            # created_at is a timestamp; add a day so the upper bound is an
+            # inclusive whole-day boundary.
+            query = query.filter(
+                AgentRun.created_at < run_filter.date_to + timedelta(days=1)
+            )
+
+        query = apply_ordering(query, AgentRun.id, order)
+
+        return paginate(query, page, page_size)
 
     def get_all( self ) -> list[AgentRun]:
         return (

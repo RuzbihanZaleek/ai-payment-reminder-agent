@@ -86,6 +86,11 @@ def test_overview_failure_returns_500():
         lambda: FakeDashboardService(exc=RuntimeError("boom"))
     )
 
-    response = client.get("/dashboard/overview")
+    # The router no longer catches -- the global handler standardizes the 500.
+    # Disable TestClient's re-raise so we observe the handler's response.
+    safe_client = TestClient(app, raise_server_exceptions=False)
+
+    response = safe_client.get("/dashboard/overview")
 
     assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"

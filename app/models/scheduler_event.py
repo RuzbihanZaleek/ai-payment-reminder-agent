@@ -16,9 +16,9 @@ class SchedulerEvent(Base):
 
     id = Column( Integer, primary_key=True )
 
-    scheduler_run_id = Column( Integer, ForeignKey("scheduler_runs.id"), nullable=False )
+    scheduler_run_id = Column( Integer, ForeignKey("scheduler_runs.id"), nullable=False, index=True )
 
-    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False )
+    contract_id = Column( Integer, ForeignKey("contracts.id"), nullable=False, index=True )
 
     status = Column( String(50), nullable=False )
 

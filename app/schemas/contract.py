@@ -12,9 +12,12 @@ class Currency(str, Enum):
 
 
 class ContractCreate(BaseModel):
+    # Reference codes are used in WhatsApp allocation ("pay INV001"), so they
+    # must be safe, unambiguous tokens: letters, digits, dashes, underscores.
     reference_code: str = Field(
         min_length=1,
-        max_length=50
+        max_length=50,
+        pattern=r"^[A-Za-z0-9_-]+$",
     )
 
     name: str = Field(
