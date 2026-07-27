@@ -2,9 +2,16 @@ from decimal import Decimal
 
 from app.agents.state import AgentState
 from app.enums.reminder_decision import ReminderDecision
+from app.services.payment_allocation_formatter import PaymentAllocationFormatter
 
 
 class ResponseGenerationNode:
+
+    def __init__(
+        self,
+        payment_allocation_formatter: PaymentAllocationFormatter,
+    ):
+        self.payment_allocation_formatter = payment_allocation_formatter
 
     def execute(
         self,
@@ -47,7 +54,50 @@ class ResponseGenerationNode:
         detection = state.payment_detection
         amount = detection.amount if detection is not None else None
         remaining = state.remaining_amount
+        allocations = state.payment_allocations
 
+        # Multiple contracts: show the per-contract allocation breakdown.
+        if len(allocations) > 1:
+            summary = self.payment_allocation_formatter.format(allocations)
+            state.allocation_summary = summary
+
+            intro = (
+                f"Thanks! I've recorded your payment of "
+                f"{self._format_money(amount)}."
+                if amount is not None
+                else "Thanks! I've recorded your payment."
+            )
+
+            lines = [intro, "Payment allocation:", summary]
+
+            if remaining is not None:
+                lines.append(
+                    f"Remaining balance: {self._format_money(remaining)}."
+                )
+
+            return "\n".join(lines)
+
+        # Explicit reference to one contract among several: name the contract.
+        if len(allocations) == 1 and len(state.resolved_contracts) > 1:
+            reference_code = allocations[0].get("reference_code")
+            applied = f" to {reference_code}" if reference_code else ""
+
+            intro = (
+                f"Thanks! I've recorded your payment of "
+                f"{self._format_money(amount)}{applied}."
+                if amount is not None
+                else "Thanks! I've recorded your payment."
+            )
+
+            if remaining is not None:
+                return (
+                    f"{intro} Remaining balance: "
+                    f"{self._format_money(remaining)}."
+                )
+
+            return intro
+
+        # Single contract (or no allocation context): existing response.
         if amount is not None:
             intro = (
                 f"Thanks! I've recorded your payment of "

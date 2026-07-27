@@ -8,6 +8,7 @@ from app.agents.contract_resolver_node import ContractResolverNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.state import AgentState
 from app.services.notification_service import FakeNotificationService
+from app.services.payment_allocation_formatter import PaymentAllocationFormatter
 from app.enums.reminder_decision import ReminderDecision
 from app.schemas.payment_detection import (
     PaymentDetectionResult,
@@ -27,7 +28,7 @@ def make_detection() -> PaymentDetectionResult:
 
 def test_approval_message():
 
-    node = ResponseGenerationNode()
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
 
     state = AgentState(
         message="I paid",
@@ -45,7 +46,7 @@ def test_approval_message():
 
 def test_completed_message():
 
-    node = ResponseGenerationNode()
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
 
     state = AgentState(
         message="Final payment",
@@ -61,7 +62,7 @@ def test_completed_message():
 
 def test_payment_received_message():
 
-    node = ResponseGenerationNode()
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
 
     state = AgentState(
         message="I paid 100",
@@ -78,9 +79,71 @@ def test_payment_received_message():
     )
 
 
+def test_multiple_contract_payment_includes_allocation():
+
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
+
+    state = AgentState(
+        message="I paid 70",
+        decision=ReminderDecision.NO_REMINDER,
+        payment_detection=PaymentDetectionResult(
+            intent=PaymentIntent.PAYMENT_RECEIVED,
+            amount=Decimal("70"),
+            currency="USD",
+            confidence=0.95,
+        ),
+        remaining_amount=Decimal("1930"),
+        resolved_contracts=[{"id": 1}, {"id": 2}],
+        payment_allocations=[
+            {"contract_id": 1, "reference_code": "INV001", "amount": Decimal("40")},
+            {"contract_id": 2, "reference_code": "INV002", "amount": Decimal("30")},
+        ],
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Thanks! I've recorded your payment of $70.\n"
+        "Payment allocation:\n"
+        "INV001: $40\n"
+        "INV002: $30\n"
+        "Remaining balance: $1,930."
+    )
+    # The breakdown is also stored on the state.
+    assert result.allocation_summary == "INV001: $40\nINV002: $30"
+
+
+def test_explicit_reference_payment_mentions_contract():
+
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
+
+    state = AgentState(
+        message="Paid INV002 $30",
+        decision=ReminderDecision.NO_REMINDER,
+        payment_detection=PaymentDetectionResult(
+            intent=PaymentIntent.PAYMENT_RECEIVED,
+            amount=Decimal("30"),
+            currency="USD",
+            confidence=0.95,
+        ),
+        remaining_amount=Decimal("970"),
+        resolved_contracts=[{"id": 1}, {"id": 2}],
+        payment_allocations=[
+            {"contract_id": 2, "reference_code": "INV002", "amount": Decimal("30")},
+        ],
+    )
+
+    result = node.execute(state)
+
+    assert result.generated_message == (
+        "Thanks! I've recorded your payment of $30 to INV002. "
+        "Remaining balance: $970."
+    )
+
+
 def test_reminder_message():
 
-    node = ResponseGenerationNode()
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
 
     state = AgentState(
         message="Any update?",
@@ -98,7 +161,7 @@ def test_reminder_message():
 
 def test_fallback_behavior():
 
-    node = ResponseGenerationNode()
+    node = ResponseGenerationNode(PaymentAllocationFormatter())
 
     # NO_REMINDER but neither the detected amount nor the remaining
     # balance is available -> must degrade gracefully, not crash.
@@ -201,7 +264,7 @@ def test_workflow_integration():
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),
         FakeReminderDecisionNode(),
-        ResponseGenerationNode(),
+        ResponseGenerationNode(PaymentAllocationFormatter()),
         NotificationNode(FakeNotificationService(), NoopReminderLogRepository()),
         PassthroughWorkflowExecutor(),
     )

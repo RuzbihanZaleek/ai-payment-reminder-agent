@@ -8,6 +8,7 @@ from app.agents.contract_resolver_node import ContractResolverNode
 from app.agents.reminder_decision_node import ReminderDecisionNode
 from app.agents.response_generation_node import ResponseGenerationNode
 from app.agents.state import AgentState
+from app.services.payment_allocation_formatter import PaymentAllocationFormatter
 from app.services.notification_service import FakeNotificationService
 from app.enums.reminder_decision import ReminderDecision
 from app.schemas.payment_detection import (
@@ -164,7 +165,7 @@ def test_workflow_integration():
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),
         ReminderDecisionNode(),
-        ResponseGenerationNode(),
+        ResponseGenerationNode(PaymentAllocationFormatter()),
         NotificationNode(FakeNotificationService(), NoopReminderLogRepository()),
         PassthroughWorkflowExecutor(),
     )

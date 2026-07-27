@@ -39,9 +39,12 @@ class AgentState(BaseModel):
     resolved_contracts: list = []
     contract_ids: list[int] = []
 
-    # Automatic payment allocation: [{contract_id, amount}] produced by the
-    # PaymentAllocationNode and consumed by PaymentCreationNode.
+    # Automatic payment allocation: [{contract_id, amount, reference_code}]
+    # produced by PaymentAllocationNode and consumed by PaymentCreationNode.
     payment_allocations: list = []
+
+    # Human-readable allocation breakdown for the generated response.
+    allocation_summary: Optional[str] = None
 
 
     # Financial information

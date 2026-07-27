@@ -21,6 +21,7 @@ from app.services.payment_service import PaymentService
 from app.services.contract_service import ContractService
 from app.services.whatsapp_notification_service import WhatsAppNotificationService
 from app.services.payment_allocation_service import PaymentAllocationService
+from app.services.payment_allocation_formatter import PaymentAllocationFormatter
 from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
 from app.services.reminder_service import ReminderService
@@ -96,7 +97,9 @@ def create_agent_execution_service(
     payment_creation_node = PaymentCreationNode(payment_service)
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
     reminder_decision_node = ReminderDecisionNode()
-    response_generation_node = ResponseGenerationNode()
+    response_generation_node = ResponseGenerationNode(
+        PaymentAllocationFormatter()
+    )
     notification_node = NotificationNode(
         notification_service,
         reminder_log_repository,
@@ -205,7 +208,7 @@ def create_reminder_workflow(
 
     return ReminderWorkflow(
         ReminderDecisionNode(),
-        ResponseGenerationNode(),
+        ResponseGenerationNode(PaymentAllocationFormatter()),
         NotificationNode(notification_service, reminder_log_repository),
         workflow_executor,
     )

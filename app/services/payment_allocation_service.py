@@ -26,7 +26,7 @@ class PaymentAllocationService:
 
         # Rule 1: an explicit reference already selected a single contract.
         if resolved_contract_id is not None:
-            return self._single(resolved_contract_id, amount)
+            return self._single(resolved_contract_id, amount, contracts)
 
         # Guard: a non-positive amount cannot be allocated.
         if amount is None or amount <= 0:
@@ -41,7 +41,7 @@ class PaymentAllocationService:
 
         # Rule 2: exactly one eligible contract -> full amount.
         if len(eligible) == 1:
-            return self._single(eligible[0]["id"], amount)
+            return self._single(eligible[0]["id"], amount, contracts)
 
         # Rule 4: distribute daily-amount units round-robin across contracts.
         allocations = self._round_robin(amount, eligible)
@@ -92,16 +92,35 @@ class PaymentAllocationService:
                 return None
 
         return [
-            {"contract_id": contract_id, "amount": total}
-            for contract_id, total in totals.items()
-            if total > 0
+            {
+                "contract_id": contract["id"],
+                "amount": totals[contract["id"]],
+                "reference_code": contract.get("reference_code"),
+            }
+            for contract in eligible
+            if totals[contract["id"]] > 0
         ]
 
-    @staticmethod
-    def _single(contract_id: int, amount) -> dict:
+    def _single(self, contract_id: int, amount, contracts: list) -> dict:
         return {
-            "allocations": [{"contract_id": contract_id, "amount": amount}],
+            "allocations": [self._allocation(contract_id, amount, contracts)],
             "requires_approval": False,
+        }
+
+    @staticmethod
+    def _allocation(contract_id: int, amount, contracts: list) -> dict:
+
+        reference_code = None
+
+        for contract in contracts or []:
+            if contract["id"] == contract_id:
+                reference_code = contract.get("reference_code")
+                break
+
+        return {
+            "contract_id": contract_id,
+            "amount": amount,
+            "reference_code": reference_code,
         }
 
     @staticmethod
