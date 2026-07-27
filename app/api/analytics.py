@@ -4,9 +4,14 @@ from app.db.session import SessionLocal
 from app.container import create_analytics_service
 from app.schemas.analytics import AnalyticsOverview
 from app.services.analytics_service import AnalyticsService
+from app.api.deps import get_current_user
 
 
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+router = APIRouter(
+    prefix="/analytics",
+    tags=["analytics"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def get_analytics_service():

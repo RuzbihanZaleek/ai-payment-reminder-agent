@@ -8,9 +8,14 @@ from app.enums.agent_run_status import AgentRunStatus
 from app.enums.agent_event_status import AgentEventStatus
 from app.container import create_agent_reporting_service
 from app.services.agent_reporting_service import AgentReportingService
+from app.api.deps import get_current_user
 
 
-router = APIRouter(prefix="/reports/agent-runs", tags=["reports"])
+router = APIRouter(
+    prefix="/reports/agent-runs",
+    tags=["reports"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class AgentRunResponse(BaseModel):

@@ -3,8 +3,11 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
+from types import SimpleNamespace
+
 from app.main import app
 from app.api.analytics import get_analytics_service
+from app.api.deps import get_current_user
 
 
 client = TestClient(app)
@@ -12,6 +15,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def _clear():
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=1)
     yield
     app.dependency_overrides.clear()
 

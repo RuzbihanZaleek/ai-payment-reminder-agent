@@ -35,6 +35,24 @@ class ContractRepository:
         )
 
 
+    def get_by_id_for_user(
+        self,
+        contract_id: int,
+        user_id: int
+    ) -> Contract | None:
+
+        return (
+            self.db.query(Contract)
+            .filter(
+                Contract.id == contract_id
+            )
+            .filter(
+                Contract.user_id == user_id
+            )
+            .first()
+        )
+
+
     def get_all(self) -> list[Contract]:
 
         return (

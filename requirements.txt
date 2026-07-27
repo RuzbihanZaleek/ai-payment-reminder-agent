@@ -12,3 +12,4 @@ langchain-openai>=0.3
 openai>=1.0
 apscheduler
 httpx
+PyJWT

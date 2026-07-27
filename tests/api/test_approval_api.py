@@ -1,10 +1,12 @@
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.api.approval import get_payment_approval_service
+from app.api.deps import get_current_user
 from app.models.payment import Payment
 from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
@@ -21,17 +23,17 @@ class FakeApprovalService:
         self.approved = []
         self.rejected = []
 
-    def get_pending_approvals(self):
+    def get_pending_approvals(self, user_id):
 
         return self.pending
 
-    def approve_payment(self, payment_id, approved_by):
+    def approve_payment(self, payment_id, approved_by, user_id):
 
         self.approved.append((payment_id, approved_by))
 
         return self.payment
 
-    def reject_payment(self, payment_id, rejected_by):
+    def reject_payment(self, payment_id, rejected_by, user_id):
 
         self.rejected.append((payment_id, rejected_by))
 
@@ -51,6 +53,8 @@ def _payment(status=PaymentStatus.PENDING, approval_status=ApprovalStatus.PENDIN
 
 @pytest.fixture
 def override_service():
+
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=1)
 
     def _install(service):
         app.dependency_overrides[get_payment_approval_service] = lambda: service

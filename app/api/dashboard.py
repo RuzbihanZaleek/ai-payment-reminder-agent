@@ -4,9 +4,14 @@ from app.db.session import SessionLocal
 from app.container import create_dashboard_service
 from app.schemas.dashboard import DashboardOverview
 from app.services.dashboard_service import DashboardService
+from app.api.deps import get_current_user
 
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def get_dashboard_service():

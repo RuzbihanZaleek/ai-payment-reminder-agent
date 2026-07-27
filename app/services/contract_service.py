@@ -14,10 +14,12 @@ class ContractService:
 
     def create_contract(
         self,
-        contract_data: ContractCreate
+        contract_data: ContractCreate,
+        user_id: int | None = None
     ) -> Contract:
 
         contract = Contract(
+            user_id=user_id,
             reference_code=contract_data.reference_code,
             name=contract_data.name,
             description=contract_data.description,

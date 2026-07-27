@@ -16,6 +16,7 @@ from app.container import (
 from app.services.contract_reporting_service import ContractReportingService
 from app.services.payment_reporting_service import PaymentReportingService
 from app.services.receipt_reporting_service import ReceiptReportingService
+from app.api.deps import require_owned_contract
 
 
 router = APIRouter(prefix="/reports/contracts", tags=["reports"])
@@ -93,6 +94,7 @@ def get_receipt_reporting_service():
 @router.get("/{contract_id}", response_model=ContractSummaryResponse)
 def get_contract_summary(
     contract_id: int,
+    contract=Depends(require_owned_contract),
     service: ContractReportingService = Depends(get_contract_reporting_service),
 ):
 
@@ -107,6 +109,7 @@ def get_contract_summary(
 @router.get("/{contract_id}/payments", response_model=list[PaymentReportResponse])
 def get_contract_payments(
     contract_id: int,
+    contract=Depends(require_owned_contract),
     service: PaymentReportingService = Depends(get_payment_reporting_service),
 ):
 
@@ -116,6 +119,7 @@ def get_contract_payments(
 @router.get("/{contract_id}/receipts", response_model=list[ReceiptReportResponse])
 def get_contract_receipts(
     contract_id: int,
+    contract=Depends(require_owned_contract),
     service: ReceiptReportingService = Depends(get_receipt_reporting_service),
 ):
 

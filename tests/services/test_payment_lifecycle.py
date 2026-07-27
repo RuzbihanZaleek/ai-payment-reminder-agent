@@ -35,6 +35,16 @@ class FakePaymentRepository:
         return payment
 
 
+class FakeContractRepository:
+    """Every contract is owned by USER_ID for these balance-focused tests."""
+
+    def get_by_id(self, contract_id):
+        return type("C", (), {"user_id": USER_ID})()
+
+
+USER_ID = 1
+
+
 def _payment(payment_id, status, approval_status, amount=Decimal("100"), manual=False):
 
     return Payment(
@@ -79,7 +89,9 @@ def test_approval_reduces_balance():
     payment = _payment(1, PaymentStatus.PENDING, ApprovalStatus.PENDING, Decimal("40"), manual=True)
     repo = FakePaymentRepository([payment])
 
-    PaymentApprovalService(repo).approve_payment(payment_id=1, approved_by="boss")
+    PaymentApprovalService(repo, FakeContractRepository()).approve_payment(
+        payment_id=1, approved_by="boss", user_id=USER_ID
+    )
 
     remaining = PaymentService(repo).calculate_remaining_amount(Decimal("1000"), 1)
 
@@ -92,7 +104,9 @@ def test_rejection_does_not_reduce_balance():
     payment = _payment(1, PaymentStatus.PENDING, ApprovalStatus.PENDING, Decimal("40"), manual=True)
     repo = FakePaymentRepository([payment])
 
-    PaymentApprovalService(repo).reject_payment(payment_id=1, rejected_by="boss")
+    PaymentApprovalService(repo, FakeContractRepository()).reject_payment(
+        payment_id=1, rejected_by="boss", user_id=USER_ID
+    )
 
     remaining = PaymentService(repo).calculate_remaining_amount(Decimal("1000"), 1)
 

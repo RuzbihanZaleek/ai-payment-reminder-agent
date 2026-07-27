@@ -7,9 +7,14 @@ from app.db.session import SessionLocal
 from app.enums.scheduler_run_status import SchedulerRunStatus
 from app.container import create_scheduler_reporting_service
 from app.services.scheduler_reporting_service import SchedulerReportingService
+from app.api.deps import get_current_user
 
 
-router = APIRouter(prefix="/reports/scheduler-runs", tags=["reports"])
+router = APIRouter(
+    prefix="/reports/scheduler-runs",
+    tags=["reports"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class SchedulerRunResponse(BaseModel):

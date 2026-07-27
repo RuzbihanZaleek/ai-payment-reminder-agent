@@ -10,8 +10,10 @@ from app.models.conversation import Conversation
 from app.models.conversation_message import ConversationMessage
 from app.models.conversation_summary import ConversationSummary
 from app.models.payment_receipt import PaymentReceipt
+from app.models.user import User
 
 __all__ = [
+    "User",
     "Contract",
     "Payment",
     "AgentRun",

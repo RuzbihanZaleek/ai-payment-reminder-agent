@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ from app.api.reports.contracts import (
 )
 from app.api.reports.agent_runs import get_agent_reporting_service
 from app.api.reports.scheduler_runs import get_scheduler_reporting_service
+from app.api.deps import get_current_user, require_owned_contract
 
 
 client = TestClient(app)
@@ -22,6 +24,10 @@ D = date(2026, 7, 27)
 
 @pytest.fixture(autouse=True)
 def _clear():
+    # Authenticated user + contract ownership are exercised separately; these
+    # tests focus on the reporting behavior, so both are stubbed.
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=1)
+    app.dependency_overrides[require_owned_contract] = lambda: SimpleNamespace(id=1, user_id=1)
     yield
     app.dependency_overrides.clear()
 

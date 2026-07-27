@@ -8,6 +8,8 @@ from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
 from app.container import create_payment_approval_service
 from app.services.payment_approval_service import PaymentApprovalService
+from app.api.deps import get_current_user
+from app.models.user import User
 
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
@@ -41,22 +43,25 @@ def get_payment_approval_service():
 
 @router.get("/pending", response_model=list[ApprovalResponse])
 def list_pending_approvals(
+    current_user: User = Depends(get_current_user),
     service: PaymentApprovalService = Depends(get_payment_approval_service),
 ):
 
-    return service.get_pending_approvals()
+    return service.get_pending_approvals(current_user.id)
 
 
 @router.post("/{payment_id}/approve", response_model=ApprovalResponse)
 def approve_payment(
     payment_id: int,
     request: ReviewRequest,
+    current_user: User = Depends(get_current_user),
     service: PaymentApprovalService = Depends(get_payment_approval_service),
 ):
 
     payment = service.approve_payment(
         payment_id=payment_id,
         approved_by=request.reviewed_by,
+        user_id=current_user.id,
     )
 
     if payment is None:
@@ -69,12 +74,14 @@ def approve_payment(
 def reject_payment(
     payment_id: int,
     request: ReviewRequest,
+    current_user: User = Depends(get_current_user),
     service: PaymentApprovalService = Depends(get_payment_approval_service),
 ):
 
     payment = service.reject_payment(
         payment_id=payment_id,
         rejected_by=request.reviewed_by,
+        user_id=current_user.id,
     )
 
     if payment is None:

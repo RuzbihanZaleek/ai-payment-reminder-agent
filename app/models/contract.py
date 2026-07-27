@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import Date, Enum as SqlEnum, Numeric, String
+from sqlalchemy import Date, Enum as SqlEnum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -20,6 +20,11 @@ class Contract(Base, IdMixin, TimestampMixin):
     __tablename__ = "contracts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+    )
 
     reference_code: Mapped[str] = mapped_column(
         String(50),

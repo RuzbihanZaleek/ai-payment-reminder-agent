@@ -15,6 +15,7 @@ from app.repositories.conversation_summary_repository import (
     ConversationSummaryRepository,
 )
 from app.repositories.payment_receipt_repository import PaymentReceiptRepository
+from app.repositories.user_repository import UserRepository
 
 from app.core.config import settings
 
@@ -42,6 +43,7 @@ from app.services.payment_analytics_service import PaymentAnalyticsService
 from app.services.reminder_analytics_service import ReminderAnalyticsService
 from app.services.agent_analytics_service import AgentAnalyticsService
 from app.services.analytics_service import AnalyticsService
+from app.services.auth_service import AuthService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -166,8 +168,9 @@ def create_payment_approval_service(
         db = SessionLocal()
 
     payment_repository = PaymentRepository(db)
+    contract_repository = ContractRepository(db)
 
-    return PaymentApprovalService(payment_repository)
+    return PaymentApprovalService(payment_repository, contract_repository)
 
 
 def create_reminder_policy_service(
@@ -412,3 +415,14 @@ def create_analytics_service(
         ),
         AgentAnalyticsService(create_agent_reporting_service(db=db)),
     )
+
+
+def create_auth_service(
+    db=None,
+) -> AuthService:
+    """Compose the authentication service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return AuthService(UserRepository(db))
