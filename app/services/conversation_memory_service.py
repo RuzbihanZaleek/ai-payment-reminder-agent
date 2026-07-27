@@ -6,6 +6,9 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.conversation_message_repository import (
     ConversationMessageRepository,
 )
+from app.repositories.conversation_summary_repository import (
+    ConversationSummaryRepository,
+)
 
 
 class ConversationMemoryService:
@@ -14,9 +17,11 @@ class ConversationMemoryService:
         self,
         conversation_repository: ConversationRepository,
         conversation_message_repository: ConversationMessageRepository,
+        conversation_summary_repository: ConversationSummaryRepository,
     ):
         self.conversation_repository = conversation_repository
         self.conversation_message_repository = conversation_message_repository
+        self.conversation_summary_repository = conversation_summary_repository
 
     def get_or_create_conversation(
         self,
@@ -73,6 +78,54 @@ class ConversationMemoryService:
             }
             for message in messages
         ]
+
+    def get_history(
+        self,
+        conversation_id: int,
+        limit: int = 10,
+    ) -> dict:
+
+        # Richer view: an optional running summary plus the recent messages.
+        return {
+            "summary": self.get_summary(conversation_id),
+            "messages": self.get_recent_history(conversation_id, limit),
+        }
+
+    def get_summary(
+        self,
+        conversation_id: int,
+    ) -> str | None:
+
+        summary = self.conversation_summary_repository.get_by_conversation_id(
+            conversation_id
+        )
+
+        return summary.summary if summary is not None else None
+
+    def update_summary(
+        self,
+        conversation_id: int,
+        summary: str,
+    ):
+
+        return self.conversation_summary_repository.create_or_update(
+            conversation_id,
+            summary,
+        )
+
+    def close_conversation(
+        self,
+        conversation_id: int,
+    ):
+
+        conversation = self.conversation_repository.get_by_id(conversation_id)
+
+        if conversation is None:
+            return None
+
+        conversation.status = ConversationStatus.CLOSED
+
+        return self.conversation_repository.update(conversation)
 
     def _store_message(
         self,

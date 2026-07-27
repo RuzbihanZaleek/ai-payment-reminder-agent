@@ -126,11 +126,11 @@ def receive_webhook(
     if contract is None:
         return {"status": "unknown_contract"}
 
-    # Conversation memory: record the incoming message and load prior context
-    # before running the agent.
+    # Conversation memory: load prior context (summary + recent messages)
+    # before running the agent. The current message is only persisted on
+    # success, so a failed run leaves no conversation messages behind.
     conversation = conversation_memory_service.get_or_create_conversation(phone)
-    conversation_memory_service.store_user_message(conversation.id, body)
-    history = conversation_memory_service.get_recent_history(conversation.id)
+    history = conversation_memory_service.get_history(conversation.id)
 
     try:
         result = service.execute(
@@ -138,7 +138,7 @@ def receive_webhook(
             message_id=message_id,
             message=body,
             conversation_id=conversation.id,
-            conversation_history=history,
+            conversation_history=history["messages"],
         )
     except Exception:
         # Never surface a non-200 to Meta; just record it for diagnosis.
@@ -149,7 +149,9 @@ def receive_webhook(
         )
         return {"status": "error"}
 
-    # Persist the assistant's reply so it becomes part of the conversation.
+    # Only after a successful run: persist the user message and assistant reply.
+    conversation_memory_service.store_user_message(conversation.id, body)
+
     if result is not None and result.generated_message is not None:
         conversation_memory_service.store_assistant_message(
             conversation.id,

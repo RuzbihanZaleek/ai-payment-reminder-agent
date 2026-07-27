@@ -36,9 +36,9 @@ class FakeConversationMemoryService:
 
         self.user_messages.append((conversation_id, content))
 
-    def get_recent_history(self, conversation_id, limit=10):
+    def get_history(self, conversation_id, limit=10):
 
-        return []
+        return {"summary": None, "messages": []}
 
     def store_assistant_message(self, conversation_id, content):
 

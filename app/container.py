@@ -11,6 +11,9 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.conversation_message_repository import (
     ConversationMessageRepository,
 )
+from app.repositories.conversation_summary_repository import (
+    ConversationSummaryRepository,
+)
 
 from app.core.config import settings
 
@@ -255,8 +258,10 @@ def create_conversation_memory_service(
 
     conversation_repository = ConversationRepository(db)
     conversation_message_repository = ConversationMessageRepository(db)
+    conversation_summary_repository = ConversationSummaryRepository(db)
 
     return ConversationMemoryService(
         conversation_repository,
         conversation_message_repository,
+        conversation_summary_repository,
     )

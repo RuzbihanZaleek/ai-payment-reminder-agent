@@ -24,6 +24,13 @@ class ConversationRepository:
             .first()
         )
 
+    def get_by_id( self, conversation_id: int ) -> Conversation | None:
+        return (
+            self.db.query(Conversation)
+            .filter(Conversation.id == conversation_id)
+            .first()
+        )
+
     def update( self, conversation: Conversation ) -> Conversation:
         self.db.commit()
         self.db.refresh(conversation)

@@ -30,11 +30,14 @@ class FakeContractRepository:
 
 class FakeProcessedMessageRepository:
 
+    def __init__(self):
+        self.created = []
+
     def exists(self, message_id):
         return False
 
     def create(self, message_id, source):
-        pass
+        self.created.append((message_id, source))
 
 
 class FakeConversation:
@@ -60,11 +63,14 @@ class RecordingMemoryService:
 
         self.user_messages.append((conversation_id, content))
 
-    def get_recent_history(self, conversation_id, limit=10):
+    def get_history(self, conversation_id, limit=10):
 
         self.history_requests.append(conversation_id)
 
-        return [{"role": "USER", "content": "earlier message"}]
+        return {
+            "summary": None,
+            "messages": [{"role": "USER", "content": "earlier message"}],
+        }
 
     def store_assistant_message(self, conversation_id, content):
 
@@ -73,8 +79,9 @@ class RecordingMemoryService:
 
 class FakeService:
 
-    def __init__(self, generated_message="Thanks, recorded."):
+    def __init__(self, generated_message="Thanks, recorded.", exc=None):
         self.generated_message = generated_message
+        self.exc = exc
         self.calls = []
 
     def execute(
@@ -95,6 +102,9 @@ class FakeService:
                 "conversation_history": conversation_history,
             }
         )
+
+        if self.exc is not None:
+            raise self.exc
 
         return SimpleNamespace(generated_message=self.generated_message)
 
@@ -168,3 +178,27 @@ def test_stores_assistant_response(memory_and_service):
 
     # The agent's generated reply is persisted as an assistant message.
     assert memory.assistant_messages == [(55, "Thanks, recorded.")]
+
+
+def test_failed_execution_stores_no_messages():
+
+    memory = RecordingMemoryService()
+    service = FakeService(exc=RuntimeError("workflow blew up"))
+    processed = FakeProcessedMessageRepository()
+
+    app.dependency_overrides[get_contract_repository] = lambda: FakeContractRepository()
+    app.dependency_overrides[get_processed_message_repository] = lambda: processed
+    app.dependency_overrides[get_conversation_memory_service] = lambda: memory
+    app.dependency_overrides[get_agent_execution_service] = lambda: service
+
+    try:
+        response = client.post("/webhook", json=_payload())
+    finally:
+        app.dependency_overrides.clear()
+
+    # Still 200 to Meta, but nothing was persisted...
+    assert response.status_code == 200
+    assert memory.user_messages == []
+    assert memory.assistant_messages == []
+    # ...and the message is not marked processed, so a retry can reprocess it.
+    assert processed.created == []
