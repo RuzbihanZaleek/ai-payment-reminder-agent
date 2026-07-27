@@ -158,6 +158,53 @@ creates a `SchedulerRun`, and logs `scheduler_run_started` /
 - **Unexpected exceptions** → masked as a `500 INTERNAL_SERVER_ERROR` envelope
   (internals never leaked); full traceback logged with the correlation id.
 
+## Production deployment architecture (multi-replica)
+
+```
+              ┌───────────────┐        Prometheus
+              │  Load balancer │        (scrapes /metrics per replica)
+              └───────┬────────┘             ▲
+        ┌─────────────┼─────────────┐        │
+        ▼             ▼             ▼         │
+   ┌─────────┐   ┌─────────┐   ┌─────────┐   │
+   │ API #1  │   │ API #2  │   │ API #3  │───┘   each replica also runs the
+   │ +sched  │   │ +sched  │   │ +sched  │       in-process scheduler...
+   └────┬────┘   └────┬────┘   └────┬────┘
+        │             │             │
+        │   pg_try_advisory_lock(SCHEDULER_LOCK_ID)  ── only ONE wins ──▶ runs reminders
+        │             │             │
+        └─────────────┼─────────────┘
+                      ▼
+              ┌───────────────┐
+              │  PostgreSQL    │  contracts / payments / agent_runs / ...
+              │                │  notification_outbox (PENDING → SENT/FAILED)
+              │                │  audit_logs (append-only)
+              └───────┬────────┘
+                      │  (outbox mode) PENDING rows
+                      ▼
+              ┌───────────────┐        ┌───────────────┐
+              │ Outbox relay   │ ─────▶ │ WhatsApp API   │  (retry + backoff)
+              │ (out of scope) │        └───────────────┘
+              └───────────────┘
+```
+
+Components:
+
+- **API containers** — stateless, horizontally scalable; each serves HTTP and
+  hosts the scheduler. Add replicas freely.
+- **PostgreSQL** — the single source of truth and the coordination point
+  (advisory lock, outbox, audit). No Redis is required.
+- **Scheduler execution lock** — a session-level advisory lock
+  (`SchedulerLockService`) ensures exactly one replica runs the daily reminder
+  job; a crashed holder's lock is released when its connection drops.
+- **Notification outbox** — in `outbox` mode the workflow records a `PENDING`
+  `NotificationOutbox` row; a separate relay (out of scope) delivers it and
+  flips it to `SENT`/`FAILED`, decoupling delivery from workflow execution.
+- **Monitoring endpoint** — `GET /metrics` (Prometheus text) exposed by every
+  replica; the metrics are process-local and aggregated by the scraper.
+- **Audit trail** — `audit_logs` records who did what (logins, approvals,
+  contract creation) for troubleshooting and compliance.
+
 ## Database indexes
 
 `alembic/versions/e6f7a8b9c0d1_add_performance_indexes.py` adds indexes on the

@@ -9,12 +9,13 @@
 """
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.core.logger import get_logger
+from app.core.metrics import metrics
 
 
 logger = get_logger(__name__)
@@ -27,6 +28,16 @@ def health() -> dict:
     """Liveness: the process is running and can serve HTTP."""
 
     return {"status": "ok"}
+
+
+@router.get("/metrics")
+def prometheus_metrics() -> PlainTextResponse:
+    """Prometheus-compatible metrics exposition (process-local counters)."""
+
+    return PlainTextResponse(
+        content=metrics.render(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 def _check_database() -> bool:

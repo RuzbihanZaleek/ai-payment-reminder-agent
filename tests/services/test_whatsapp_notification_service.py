@@ -36,6 +36,7 @@ def _service():
         access_token="TOKEN_ABC",
         phone_number_id="PHONE_123",
         api_version="v21.0",
+        retry_delay_seconds=0,  # no real backoff sleeping in tests
     )
 
 

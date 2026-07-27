@@ -11,6 +11,8 @@ from app.models.conversation_message import ConversationMessage
 from app.models.conversation_summary import ConversationSummary
 from app.models.payment_receipt import PaymentReceipt
 from app.models.user import User
+from app.models.notification_outbox import NotificationOutbox
+from app.models.audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -26,4 +28,6 @@ __all__ = [
     "ConversationMessage",
     "ConversationSummary",
     "PaymentReceipt",
+    "NotificationOutbox",
+    "AuditLog",
 ]

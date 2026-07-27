@@ -6,6 +6,9 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.core.config import settings
 from app.core.logger import get_logger, set_request_id
+from app.core.metrics import record_reminder
+from app.db.session import SessionLocal
+from app.services.scheduler_lock_service import SchedulerLockService
 from app.container import (
     create_reminder_service,
     create_reminder_execution_service,
@@ -22,7 +25,43 @@ logger = get_logger(__name__)
 _JOB_ID = "send_daily_reminders"
 
 
+def _open_scheduler_lock():
+    """Open a dedicated session + advisory-lock service (overridable in tests).
+
+    The lock is session-level, so the session must stay open for the whole run;
+    the caller closes it in a finally block.
+    """
+
+    session = SessionLocal()
+    return SchedulerLockService(session, settings.SCHEDULER_LOCK_ID), session
+
+
 def send_daily_reminders():
+    """Entry point for the daily reminder job.
+
+    Guarded by a PostgreSQL advisory lock so that, across multiple replicas,
+    exactly one instance runs the reminders; the rest skip. The actual reminder
+    orchestration is unchanged -- see ``_execute_daily_reminders``.
+    """
+
+    lock_service, lock_session = _open_scheduler_lock()
+
+    try:
+        if not lock_service.acquire():
+            # Another replica is already running the daily reminders.
+            logger.info(
+                "scheduler_skipped_locked",
+                extra={"lock_id": settings.SCHEDULER_LOCK_ID},
+            )
+            return
+
+        _execute_daily_reminders()
+    finally:
+        lock_service.release()
+        lock_session.close()
+
+
+def _execute_daily_reminders():
     """Fetch contracts due a reminder, run each, and record the run + events.
 
     Pure orchestration -- the "which contracts" and "what happens" decisions
@@ -71,6 +110,7 @@ def send_daily_reminders():
                 reminder_execution_service.execute(contract)
             except Exception as exc:
                 failed_count += 1
+                record_reminder(sent=False)
 
                 event_repository.create(
                     SchedulerEvent(
@@ -88,6 +128,7 @@ def send_daily_reminders():
                 continue
 
             successful_count += 1
+            record_reminder(sent=True)
 
             event_repository.create(
                 SchedulerEvent(

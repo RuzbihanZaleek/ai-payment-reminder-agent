@@ -78,7 +78,31 @@ class FakeSchedulerEventRepository:
         return scheduler_event
 
 
+class _FakeLock:
+    def acquire(self):
+        return True
+
+    def release(self):
+        pass
+
+
+class _FakeLockSession:
+    def close(self):
+        pass
+
+
+def _stub_lock(monkeypatch):
+    # The advisory lock always succeeds in these unit tests (no Postgres).
+    monkeypatch.setattr(
+        scheduler_module,
+        "_open_scheduler_lock",
+        lambda: (_FakeLock(), _FakeLockSession()),
+    )
+
+
 def _install(monkeypatch, contracts, execution_service, run_repo, event_repo):
+
+    _stub_lock(monkeypatch)
 
     monkeypatch.setattr(
         scheduler_module,
@@ -174,6 +198,8 @@ def test_top_level_failure_marks_run_failed(monkeypatch):
 
     run_repo = FakeSchedulerRunRepository()
     event_repo = FakeSchedulerEventRepository()
+
+    _stub_lock(monkeypatch)
 
     # A failure *outside* the per-contract loop (here, fetching contracts).
     monkeypatch.setattr(

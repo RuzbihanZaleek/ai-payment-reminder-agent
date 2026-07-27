@@ -381,6 +381,11 @@ See [`.env.example`](.env.example). Summary:
 | `SCHEDULER_ENABLED` | no | `true` | |
 | `SCHEDULER_HOUR` / `SCHEDULER_MINUTE` | no | `9` / `0` | daily reminder time |
 | `SCHEDULER_MISFIRE_GRACE_TIME` | no | `3600` | seconds |
+| `SCHEDULER_LOCK_ID` | no | `902025105` | PG advisory-lock key (one replica runs the job) |
+| `WHATSAPP_MAX_RETRIES` | no | `3` | transient-failure retries |
+| `WHATSAPP_RETRY_DELAY_SECONDS` | no | `2` | base for exponential backoff |
+| `WHATSAPP_TIMEOUT_SECONDS` | no | `10` | per-request timeout |
+| `NOTIFICATION_MODE` | no | `direct` | `direct` or `outbox` |
 | `RATE_LIMIT_ENABLED` | no | `true` | |
 | `RATE_LIMIT_LOGIN_PER_MINUTE` | no | `5` | per IP |
 | `RATE_LIMIT_REGISTER_PER_MINUTE` | no | `5` | per IP |
@@ -407,6 +412,29 @@ is duplicated (`app/api/v1/__init__.py`).
 error envelope. The limiter is in-memory (process-local) and hidden behind a
 small `allow(...)` interface so it can be swapped for a Redis backend later
 without touching routers. It is disabled under `APP_ENV=testing`.
+
+### Production reliability (multi-replica)
+
+- **Distributed scheduler lock** — each replica runs the in-process scheduler,
+  but the daily reminder job acquires a PostgreSQL advisory lock
+  (`SchedulerLockService`) first; only the winner runs the reminders, the rest
+  log `scheduler_skipped_locked` and return. No Redis.
+- **WhatsApp delivery retries** — `WhatsAppNotificationService` retries transient
+  failures (timeout, connection error, HTTP 429/5xx) with exponential backoff
+  (`retry_policy.py`), never retries client errors (400/401/403), logs each
+  `whatsapp_retry_attempt`, and still returns `False` on final failure (delivery
+  never breaks the workflow).
+- **Notification outbox** — set `NOTIFICATION_MODE=outbox` to have the workflow
+  persist a `PENDING` `NotificationOutbox` row instead of sending inline; an
+  out-of-band relay delivers it, so a provider outage can't fail a run. Default
+  `direct` preserves the original inline behavior.
+- **Metrics** — `GET /metrics` exposes Prometheus-format counters/summaries
+  (API requests + duration, workflow executions/failures/duration, payments
+  processed, approval requests, reminders sent/failed). Process-local; a
+  Prometheus server scrapes each replica.
+- **Audit trail** — security/business actions (login success/failure, payment
+  approve/reject, contract creation) are written to `audit_logs` via
+  `AuditService`. Secrets are never stored.
 
 ---
 

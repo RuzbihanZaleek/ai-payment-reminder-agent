@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -8,6 +9,7 @@ from fastapi.routing import APIRoute
 from app.core.config import settings
 from app.core.logger import get_logger, set_request_id
 from app.core.errors import register_exception_handlers
+from app.core.metrics import record_api_request
 from app.scheduler import start_scheduler, shutdown_scheduler
 
 from app.api.v1 import api_v1_router
@@ -81,7 +83,11 @@ async def request_id_middleware(request: Request, call_next):
 
     set_request_id(request_id)
 
-    response = await call_next(request)
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    finally:
+        record_api_request(time.perf_counter() - start)
 
     response.headers["X-Request-ID"] = request_id
 

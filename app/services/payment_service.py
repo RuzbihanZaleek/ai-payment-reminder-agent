@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from app.models.payment import Payment
 from app.enums.approval_status import ApprovalStatus
+from app.core.metrics import record_payment_processed
 from app.repositories.payment_repository import PaymentRepository
 
 
@@ -11,7 +12,9 @@ class PaymentService:
         self.repository = repository
 
     def create_payment( self, payment: Payment ) -> Payment:
-        return self.repository.create(payment)
+        created = self.repository.create(payment)
+        record_payment_processed()
+        return created
 
     def get_payment( self, payment_id: int ) -> Payment | None:
         return self.repository.get_by_id(payment_id)

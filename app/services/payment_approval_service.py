@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.core.logger import get_logger
+from app.core.metrics import record_approval_request
 from app.models.payment import Payment
 from app.enums.payment_status import PaymentStatus
 from app.enums.approval_status import ApprovalStatus
@@ -17,9 +18,11 @@ class PaymentApprovalService:
         self,
         payment_repository: PaymentRepository,
         contract_repository: ContractRepository,
+        audit_service=None,
     ):
         self.payment_repository = payment_repository
         self.contract_repository = contract_repository
+        self.audit_service = audit_service
 
     def _is_owned_by(self, payment: Payment | None, user_id: int) -> bool:
 
@@ -81,6 +84,16 @@ class PaymentApprovalService:
                 "reviewed_by": approved_by,
             },
         )
+        record_approval_request()
+
+        if self.audit_service is not None:
+            self.audit_service.record(
+                action=self.audit_service.PAYMENT_APPROVED,
+                user_id=user_id,
+                entity_type="payment",
+                entity_id=payment_id,
+                metadata={"reviewed_by": approved_by},
+            )
 
         return self.payment_repository.update(payment)
 
@@ -109,5 +122,15 @@ class PaymentApprovalService:
                 "reviewed_by": rejected_by,
             },
         )
+        record_approval_request()
+
+        if self.audit_service is not None:
+            self.audit_service.record(
+                action=self.audit_service.PAYMENT_REJECTED,
+                user_id=user_id,
+                entity_type="payment",
+                entity_id=payment_id,
+                metadata={"reviewed_by": rejected_by},
+            )
 
         return self.payment_repository.update(payment)

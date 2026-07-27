@@ -66,8 +66,38 @@ class FakeSchedulerEventRepository:
         return scheduler_event
 
 
-def _install_tracking(monkeypatch):
+class FakeLock:
 
+    def __init__(self, acquired=True):
+        self._acquired = acquired
+        self.released = False
+
+    def acquire(self):
+        return self._acquired
+
+    def release(self):
+        self.released = True
+
+
+class FakeLockSession:
+
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+def _install_tracking(monkeypatch, lock=None):
+
+    lock = lock if lock is not None else FakeLock(acquired=True)
+    session = FakeLockSession()
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "_open_scheduler_lock",
+        lambda: (lock, session),
+    )
     monkeypatch.setattr(
         scheduler_module,
         "create_scheduler_run_repository",
@@ -78,6 +108,8 @@ def _install_tracking(monkeypatch):
         "create_scheduler_event_repository",
         lambda: FakeSchedulerEventRepository(),
     )
+
+    return lock, session
 
 
 def test_scheduler_calls_reminder_job(monkeypatch):
@@ -140,6 +172,58 @@ def test_reminder_job_continues_after_failure(monkeypatch):
 
     # A failure on c1 must not stop c2 from being processed
     assert execution_service.executed == [c1, c2]
+
+
+def test_scheduler_skips_execution_when_locked(monkeypatch):
+
+    execution_service = FakeReminderExecutionService()
+    reminder_service = FakeReminderService([FakeContract(1)])
+
+    monkeypatch.setattr(
+        scheduler_module, "create_reminder_service", lambda: reminder_service
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_execution_service",
+        lambda: execution_service,
+    )
+    # Another replica holds the lock.
+    lock, session = _install_tracking(monkeypatch, lock=FakeLock(acquired=False))
+
+    scheduler_module.send_daily_reminders()
+
+    # No reminders executed; the lock/session are still cleaned up.
+    assert execution_service.executed == []
+    assert lock.released is True
+    assert session.closed is True
+
+
+def test_scheduler_releases_lock_after_failure(monkeypatch):
+
+    class FailingReminderService:
+        def get_pending_reminders(self):
+            raise RuntimeError("cannot fetch contracts")
+
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_service",
+        lambda: FailingReminderService(),
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_execution_service",
+        lambda: FakeReminderExecutionService(),
+    )
+    lock, session = _install_tracking(monkeypatch)
+
+    import pytest
+
+    with pytest.raises(RuntimeError):
+        scheduler_module.send_daily_reminders()
+
+    # The advisory lock must be released even when the run fails.
+    assert lock.released is True
+    assert session.closed is True
 
 
 def test_create_scheduler_registers_daily_job():

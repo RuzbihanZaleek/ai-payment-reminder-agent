@@ -7,9 +7,11 @@ class ContractService:
 
     def __init__(
         self,
-        repository: ContractRepository
+        repository: ContractRepository,
+        audit_service=None,
     ):
         self.repository = repository
+        self.audit_service = audit_service
 
 
     def create_contract(
@@ -31,7 +33,18 @@ class ContractService:
             whatsapp_chat_id=contract_data.whatsapp_chat_id,
         )
 
-        return self.repository.create(contract)
+        created = self.repository.create(contract)
+
+        if self.audit_service is not None:
+            self.audit_service.record(
+                action=self.audit_service.CONTRACT_CREATED,
+                user_id=user_id,
+                entity_type="contract",
+                entity_id=created.id,
+                metadata={"reference_code": created.reference_code},
+            )
+
+        return created
 
 
     def get_contract(

@@ -16,8 +16,10 @@ class AuthService:
     def __init__(
         self,
         user_repository: UserRepository,
+        audit_service=None,
     ):
         self.user_repository = user_repository
+        self.audit_service = audit_service
 
     def register(self, email: str, password: str) -> User:
 
@@ -49,6 +51,7 @@ class AuthService:
                 "auth_login_failed",
                 extra={"email": email, "reason": "user_not_found"},
             )
+            self._audit_login_failed(email, "user_not_found")
             return None
 
         if not verify_password(password, user.hashed_password):
@@ -56,11 +59,32 @@ class AuthService:
                 "auth_login_failed",
                 extra={"email": email, "reason": "invalid_password"},
             )
+            self._audit_login_failed(email, "invalid_password", user_id=user.id)
             return None
 
         logger.info("auth_login_success", extra={"user_id": user.id})
 
+        if self.audit_service is not None:
+            self.audit_service.record(
+                action=self.audit_service.USER_LOGIN,
+                user_id=user.id,
+                entity_type="user",
+                entity_id=user.id,
+            )
+
         return user
+
+    def _audit_login_failed(self, email: str, reason: str, user_id: int | None = None) -> None:
+        # Never store the password; only the email + reason.
+        if self.audit_service is None:
+            return
+
+        self.audit_service.record(
+            action=self.audit_service.USER_LOGIN_FAILED,
+            user_id=user_id,
+            entity_type="user",
+            metadata={"email": email, "reason": reason},
+        )
 
     def get_user(self, user_id: int) -> User | None:
 

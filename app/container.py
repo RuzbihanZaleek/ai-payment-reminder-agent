@@ -16,6 +16,10 @@ from app.repositories.conversation_summary_repository import (
 )
 from app.repositories.payment_receipt_repository import PaymentReceiptRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.notification_outbox_repository import (
+    NotificationOutboxRepository,
+)
+from app.repositories.audit_log_repository import AuditLogRepository
 
 from app.core.config import settings
 
@@ -44,6 +48,8 @@ from app.services.reminder_analytics_service import ReminderAnalyticsService
 from app.services.agent_analytics_service import AgentAnalyticsService
 from app.services.analytics_service import AnalyticsService
 from app.services.auth_service import AuthService
+from app.services.notification_outbox_service import NotificationOutboxService
+from app.services.audit_service import AuditService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -100,6 +106,9 @@ def create_agent_execution_service(
         access_token=settings.WHATSAPP_ACCESS_TOKEN,
         phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
         api_version=settings.WHATSAPP_API_VERSION,
+        max_retries=settings.WHATSAPP_MAX_RETRIES,
+        retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
+        timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
     )
 
     # Agents.
@@ -128,6 +137,10 @@ def create_agent_execution_service(
     notification_node = NotificationNode(
         notification_service,
         reminder_log_repository,
+        notification_outbox_service=NotificationOutboxService(
+            NotificationOutboxRepository(db)
+        ),
+        notification_mode=settings.NOTIFICATION_MODE,
     )
 
     # Infrastructure -- receives the shared AgentRunRepository.
@@ -170,7 +183,11 @@ def create_payment_approval_service(
     payment_repository = PaymentRepository(db)
     contract_repository = ContractRepository(db)
 
-    return PaymentApprovalService(payment_repository, contract_repository)
+    return PaymentApprovalService(
+        payment_repository,
+        contract_repository,
+        audit_service=create_audit_service(db=db),
+    )
 
 
 def create_reminder_policy_service(
@@ -231,12 +248,22 @@ def create_reminder_workflow(
         access_token=settings.WHATSAPP_ACCESS_TOKEN,
         phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
         api_version=settings.WHATSAPP_API_VERSION,
+        max_retries=settings.WHATSAPP_MAX_RETRIES,
+        retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
+        timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
     )
 
     return ReminderWorkflow(
         ReminderDecisionNode(),
         ResponseGenerationNode(PaymentAllocationFormatter()),
-        NotificationNode(notification_service, reminder_log_repository),
+        NotificationNode(
+            notification_service,
+            reminder_log_repository,
+            notification_outbox_service=NotificationOutboxService(
+                NotificationOutboxRepository(db)
+            ),
+            notification_mode=settings.NOTIFICATION_MODE,
+        ),
         workflow_executor,
     )
 
@@ -417,6 +444,42 @@ def create_analytics_service(
     )
 
 
+def create_notification_outbox_service(
+    db=None,
+) -> NotificationOutboxService:
+    """Compose the notification outbox service (records pending notifications)."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return NotificationOutboxService(NotificationOutboxRepository(db))
+
+
+def create_audit_service(
+    db=None,
+) -> AuditService:
+    """Compose the audit-trail service."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return AuditService(AuditLogRepository(db))
+
+
+def create_contract_service(
+    db=None,
+) -> ContractService:
+    """Compose the write-path ContractService (with audit) for contract creation."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return ContractService(
+        ContractRepository(db),
+        audit_service=create_audit_service(db=db),
+    )
+
+
 def create_auth_service(
     db=None,
 ) -> AuthService:
@@ -425,4 +488,7 @@ def create_auth_service(
     if db is None:
         db = SessionLocal()
 
-    return AuthService(UserRepository(db))
+    return AuthService(
+        UserRepository(db),
+        audit_service=create_audit_service(db=db),
+    )

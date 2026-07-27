@@ -1,7 +1,9 @@
+import time
 from datetime import datetime, timezone
 
 from app.agents.state import AgentState
 from app.agents.payment_workflow import PaymentWorkflow
+from app.core.metrics import record_workflow
 from app.models.agent_run import AgentRun
 from app.enums.agent_run_status import AgentRunStatus
 from app.repositories.agent_run_repository import AgentRunRepository
@@ -50,12 +52,16 @@ class AgentExecutionService:
             resolved_contracts=resolved_contracts or [],
         )
 
+        start = time.perf_counter()
         try:
             # The workflow marks the run COMPLETED after its final node.
-            return self.payment_workflow.process(state, agent_run.id)
+            result = self.payment_workflow.process(state, agent_run.id)
+            record_workflow(success=True, duration_seconds=time.perf_counter() - start)
+            return result
         except Exception:
             # A failure may surface before the workflow marks the run failed
             # (or from a workflow that never got that far), so guarantee it here.
+            record_workflow(success=False, duration_seconds=time.perf_counter() - start)
             agent_run.status = AgentRunStatus.FAILED
             agent_run.completed_at = datetime.now(timezone.utc)
             self.agent_run_repository.update(agent_run)

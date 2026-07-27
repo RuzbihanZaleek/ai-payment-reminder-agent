@@ -62,6 +62,20 @@ class Settings(BaseSettings):
     # If a run is missed (app was down), allow it to fire within this window,
     # coalesced into a single run -- never a burst of catch-up runs.
     SCHEDULER_MISFIRE_GRACE_TIME: int = 3600
+    # PostgreSQL advisory-lock key guarding the daily reminder job so only one
+    # replica executes it. An arbitrary but stable 64-bit integer.
+    SCHEDULER_LOCK_ID: int = 902_025_105
+
+    # --- WhatsApp delivery reliability -------------------------------------
+    WHATSAPP_MAX_RETRIES: int = 3
+    WHATSAPP_RETRY_DELAY_SECONDS: int = 2
+    WHATSAPP_TIMEOUT_SECONDS: float = 10.0
+
+    # --- Notifications ------------------------------------------------------
+    # "direct" sends inline during the workflow (current behavior);
+    # "outbox" records a PENDING NotificationOutbox row instead (a relay would
+    # send it out-of-band). Default preserves existing behavior.
+    NOTIFICATION_MODE: str = "direct"
 
     # --- Rate limiting ------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = True
@@ -134,6 +148,13 @@ class Settings(BaseSettings):
     def _validate_jwt_expiry(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("JWT_EXPIRE_MINUTES must be a positive integer.")
+        return value
+
+    @field_validator("NOTIFICATION_MODE")
+    @classmethod
+    def _validate_notification_mode(cls, value: str) -> str:
+        if value not in {"direct", "outbox"}:
+            raise ValueError("NOTIFICATION_MODE must be 'direct' or 'outbox'.")
         return value
 
     # --- Production hardening ----------------------------------------------
