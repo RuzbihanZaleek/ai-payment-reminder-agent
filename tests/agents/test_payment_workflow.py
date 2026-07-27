@@ -45,6 +45,18 @@ class FakeContractResolverNode:
         return state
 
 
+class FakePaymentAllocationNode:
+
+    def __init__(self):
+        self.executed = False
+
+    def execute(self, state):
+
+        self.executed = True
+
+        return state
+
+
 class FakeApprovalCreationNode:
 
     def __init__(self):
@@ -144,6 +156,7 @@ def test_payment_workflow():
 
     confidence_checker = FakeConfidenceChecker()
     contract_resolver_node = FakeContractResolverNode()
+    payment_allocation_node = FakePaymentAllocationNode()
     approval_creation_node = FakeApprovalCreationNode()
     payment_creation_node = FakePaymentCreationNode()
     balance_update_node = FakeBalanceUpdateNode()
@@ -156,6 +169,7 @@ def test_payment_workflow():
         PaymentDetectionNode(FakePaymentAgent()),
         ConfidenceCheckerNode(confidence_checker),
         contract_resolver_node,
+        payment_allocation_node,
         approval_creation_node,
         payment_creation_node,
         balance_update_node,
@@ -208,6 +222,7 @@ def test_payment_workflow():
         "PaymentDetectionNode",
         "ConfidenceCheckerNode",
         "ContractResolverNode",
+        "PaymentAllocationNode",
         "ApprovalCreationNode",
         "PaymentCreationNode",
         "BalanceUpdateNode",
@@ -216,8 +231,9 @@ def test_payment_workflow():
         "NotificationNode",
     ]
 
-    # Contract resolver + approval nodes run in the pipeline
+    # Contract resolver + allocation + approval nodes run in the pipeline
     assert contract_resolver_node.executed is True
+    assert payment_allocation_node.executed is True
     assert approval_creation_node.executed is True
 
     # A successful workflow marks the run completed with the given run id

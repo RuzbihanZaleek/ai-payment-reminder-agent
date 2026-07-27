@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.services.payment_service import PaymentService
 from app.services.contract_service import ContractService
 from app.services.whatsapp_notification_service import WhatsAppNotificationService
+from app.services.payment_allocation_service import PaymentAllocationService
 from app.services.payment_approval_service import PaymentApprovalService
 from app.services.agent_execution_service import AgentExecutionService
 from app.services.reminder_service import ReminderService
@@ -33,6 +34,7 @@ from app.agents.confidence_checker import ConfidenceChecker
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
 from app.agents.contract_resolver_node import ContractResolverNode
+from app.agents.payment_allocation_node import PaymentAllocationNode
 from app.agents.approval_creation_node import ApprovalCreationNode
 from app.agents.payment_creation_node import PaymentCreationNode
 from app.agents.balance_update_node import BalanceUpdateNode
@@ -68,6 +70,7 @@ def create_agent_execution_service(
     # Services.
     payment_service = PaymentService(payment_repository)
     contract_service = ContractService(contract_repository)
+    payment_allocation_service = PaymentAllocationService(payment_service)
     notification_service = WhatsAppNotificationService(
         access_token=settings.WHATSAPP_ACCESS_TOKEN,
         phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
@@ -88,6 +91,7 @@ def create_agent_execution_service(
     payment_detection_node = PaymentDetectionNode(payment_agent)
     confidence_checker_node = ConfidenceCheckerNode(confidence_checker)
     contract_resolver_node = ContractResolverNode()
+    payment_allocation_node = PaymentAllocationNode(payment_allocation_service)
     approval_creation_node = ApprovalCreationNode(payment_service)
     payment_creation_node = PaymentCreationNode(payment_service)
     balance_update_node = BalanceUpdateNode(payment_service, contract_service)
@@ -109,6 +113,7 @@ def create_agent_execution_service(
         payment_detection_node,
         confidence_checker_node,
         contract_resolver_node,
+        payment_allocation_node,
         approval_creation_node,
         payment_creation_node,
         balance_update_node,

@@ -45,7 +45,7 @@ def test_resolves_explicit_reference():
     assert result.requires_approval is False
 
 
-def test_unknown_reference_requires_approval():
+def test_unknown_reference_defers_to_allocation():
 
     node = ContractResolverNode()
 
@@ -57,11 +57,14 @@ def test_unknown_reference_requires_approval():
 
     result = node.execute(state)
 
+    # No matching reference -> don't resolve, don't force approval here;
+    # automatic allocation happens downstream.
     assert result.contract_ids == []
-    assert result.requires_approval is True
+    assert result.contract_id is None
+    assert result.requires_approval is False
 
 
-def test_no_reference_does_not_guess():
+def test_no_reference_defers_to_allocation():
 
     node = ContractResolverNode()
 
@@ -75,7 +78,7 @@ def test_no_reference_does_not_guess():
 
     assert result.contract_ids == []
     assert result.contract_id is None
-    assert result.requires_approval is True
+    assert result.requires_approval is False
 
 
 def test_ambiguous_multiple_references_requires_approval():
@@ -91,6 +94,7 @@ def test_ambiguous_multiple_references_requires_approval():
     result = node.execute(state)
 
     assert set(result.contract_ids) == {1, 2}
+    assert result.contract_id is None
     assert result.requires_approval is True
 
 

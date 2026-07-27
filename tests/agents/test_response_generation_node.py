@@ -169,6 +169,13 @@ class PassthroughWorkflowExecutor:
         pass
 
 
+class NoopAllocationNode:
+
+    def execute(self, state):
+
+        return state
+
+
 class NoopApprovalNode:
 
     def execute(self, state):
@@ -189,6 +196,7 @@ def test_workflow_integration():
         PaymentDetectionNode(FakePaymentAgent()),
         ConfidenceCheckerNode(FakeConfidenceChecker()),
         ContractResolverNode(),
+        NoopAllocationNode(),
         NoopApprovalNode(),
         FakePaymentCreationNode(),
         FakeBalanceUpdateNode(),

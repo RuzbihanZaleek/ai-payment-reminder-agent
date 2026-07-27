@@ -30,7 +30,7 @@ class ContractResolverNode:
             return state
 
         # Rule 3: multiple contracts -> require an explicit, unambiguous
-        # reference. Never guess.
+        # reference. Never guess here; automatic allocation happens downstream.
         message = (state.message or "").lower()
 
         matched_ids = [
@@ -42,10 +42,16 @@ class ContractResolverNode:
         state.contract_ids = matched_ids
 
         if len(matched_ids) == 1:
+            # Exactly one explicit reference -> resolved.
             state.contract_id = matched_ids[0]
-        else:
-            # Zero references (don't guess) or ambiguous -> needs a human.
+        elif len(matched_ids) > 1:
+            # Ambiguous multiple references -> a human decides (out of scope).
+            state.contract_id = None
             state.requires_approval = True
+        else:
+            # No reference at all -> defer to automatic payment allocation.
+            # Clear any pre-set primary so the allocator isn't short-circuited.
+            state.contract_id = None
 
         return state
 
