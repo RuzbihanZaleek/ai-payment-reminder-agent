@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.db.session import SessionLocal
 from app.core.security import create_access_token
 from app.core.errors import ConflictError, UnauthorizedError, ErrorCode
+from app.core.rate_limit import rate_limit_login, rate_limit_register
 from app.container import create_auth_service
 from app.services.auth_service import AuthService, EmailAlreadyRegisteredError
 
@@ -59,7 +60,12 @@ def get_auth_service():
         db.close()
 
 
-@router.post("/register", response_model=UserResponse, status_code=201)
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=201,
+    dependencies=[Depends(rate_limit_register)],
+)
 def register(
     request: RegisterRequest,
     service: AuthService = Depends(get_auth_service),
@@ -74,7 +80,11 @@ def register(
         )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit_login)],
+)
 def login(
     request: LoginRequest,
     service: AuthService = Depends(get_auth_service),

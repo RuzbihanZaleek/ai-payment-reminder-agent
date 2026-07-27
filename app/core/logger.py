@@ -57,8 +57,27 @@ class JsonFormatter(logging.Formatter):
 _configured = False
 
 
-def configure_logging(level: int = logging.INFO) -> None:
-    """Attach a JSON stdout handler to the root logger (idempotent)."""
+def _resolve_level(level: int | str | None) -> int:
+    """Resolve the effective log level, defaulting to the configured LOG_LEVEL."""
+
+    if level is None:
+        # Imported lazily to avoid a hard import cycle at module load.
+        from app.core.config import settings
+
+        level = settings.LOG_LEVEL
+
+    if isinstance(level, str):
+        return logging.getLevelNamesMapping().get(level.upper(), logging.INFO)
+
+    return level
+
+
+def configure_logging(level: int | str | None = None) -> None:
+    """Attach a JSON stdout handler to the root logger (idempotent).
+
+    The level defaults to ``settings.LOG_LEVEL`` so operators control verbosity
+    per environment without code changes.
+    """
 
     global _configured
 
@@ -71,7 +90,7 @@ def configure_logging(level: int = logging.INFO) -> None:
 
     root = logging.getLogger()
     root.addHandler(handler)
-    root.setLevel(level)
+    root.setLevel(_resolve_level(level))
 
     _configured = True
 

@@ -21,9 +21,12 @@ class AuthService:
 
     def register(self, email: str, password: str) -> User:
 
+        # Never log the password; the email is the auth identifier.
         if self.user_repository.get_by_email(email) is not None:
-            # Never log the password; the email is the auth identifier.
-            logger.info("registration_rejected_duplicate_email", extra={"email": email})
+            logger.info(
+                "auth_register_failed",
+                extra={"email": email, "reason": "email_already_registered"},
+            )
             raise EmailAlreadyRegisteredError(email)
 
         user = self.user_repository.create(
@@ -33,7 +36,7 @@ class AuthService:
             )
         )
 
-        logger.info("user_registered", extra={"user_id": user.id, "email": email})
+        logger.info("auth_register_success", extra={"user_id": user.id, "email": email})
 
         return user
 
@@ -41,11 +44,21 @@ class AuthService:
 
         user = self.user_repository.get_by_email(email)
 
-        if user is None or not verify_password(password, user.hashed_password):
-            logger.info("authentication_failed", extra={"email": email})
+        if user is None:
+            logger.info(
+                "auth_login_failed",
+                extra={"email": email, "reason": "user_not_found"},
+            )
             return None
 
-        logger.info("authentication_succeeded", extra={"user_id": user.id})
+        if not verify_password(password, user.hashed_password):
+            logger.info(
+                "auth_login_failed",
+                extra={"email": email, "reason": "invalid_password"},
+            )
+            return None
+
+        logger.info("auth_login_success", extra={"user_id": user.id})
 
         return user
 

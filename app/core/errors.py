@@ -38,6 +38,7 @@ class ErrorCode(str, Enum):
     FORBIDDEN = "FORBIDDEN"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     NOT_FOUND = "NOT_FOUND"
+    RATE_LIMITED = "RATE_LIMITED"
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
 
 
@@ -82,6 +83,11 @@ class ConflictError(AppError):
     code = ErrorCode.VALIDATION_ERROR
 
 
+class RateLimitedError(AppError):
+    status_code = 429
+    code = ErrorCode.RATE_LIMITED
+
+
 def _error_body(code: str, message: str) -> dict:
     return {"error": {"code": code, "message": message}}
 
@@ -99,6 +105,7 @@ _STATUS_TO_CODE = {
     404: ErrorCode.NOT_FOUND,
     409: ErrorCode.VALIDATION_ERROR,
     422: ErrorCode.VALIDATION_ERROR,
+    429: ErrorCode.RATE_LIMITED,
 }
 
 

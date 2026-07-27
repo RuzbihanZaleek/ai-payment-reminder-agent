@@ -1,4 +1,6 @@
-from pydantic import field_validator
+import logging
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,26 +10,105 @@ _MIN_JWT_SECRET_LENGTH = 32
 
 _SUPPORTED_JWT_ALGORITHMS = {"HS256", "HS384", "HS512"}
 
+_APP_ENVIRONMENTS = {"development", "testing", "production"}
+
+
+def _split_csv(value: str) -> list[str]:
+    """Parse a comma-separated env value into a clean list (``*`` -> ["*"])."""
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 
 class Settings(BaseSettings):
-    DATABASE_URL: str
+    # --- Environment --------------------------------------------------------
+    APP_ENV: str = "development"
+    LOG_LEVEL: str = "INFO"
+    DEBUG: bool = False
+    ENABLE_DOCS: bool = True
 
+    # --- Database -----------------------------------------------------------
+    DATABASE_URL: str
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_RECYCLE: int = 1800  # seconds; recycle connections before the DB drops them
+    DB_POOL_PRE_PING: bool = True
+    DB_ECHO: bool = False
+
+    # --- OpenAI -------------------------------------------------------------
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-5.5"
 
+    # --- WhatsApp (Meta Cloud API) ------------------------------------------
     WHATSAPP_VERIFY_TOKEN: str = ""
     WHATSAPP_ACCESS_TOKEN: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_API_VERSION: str = "v25.0"
 
+    # --- Authentication / JWT ----------------------------------------------
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
+    # --- CORS ---------------------------------------------------------------
+    # Comma-separated; "*" allows all. Exposed as lists via the properties below.
+    CORS_ALLOW_ORIGINS: str = "*"
+    CORS_ALLOW_METHODS: str = "*"
+    CORS_ALLOW_HEADERS: str = "*"
+
+    # --- Background scheduler ----------------------------------------------
+    SCHEDULER_ENABLED: bool = True
+    SCHEDULER_HOUR: int = 9
+    SCHEDULER_MINUTE: int = 0
+    # If a run is missed (app was down), allow it to fire within this window,
+    # coalesced into a single run -- never a burst of catch-up runs.
+    SCHEDULER_MISFIRE_GRACE_TIME: int = 3600
+
+    # --- Rate limiting ------------------------------------------------------
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
+    RATE_LIMIT_REGISTER_PER_MINUTE: int = 5
+    RATE_LIMIT_WEBHOOK_PER_MINUTE: int = 100
+
     model_config = SettingsConfigDict(
         env_file=".env",
-        extra="ignore"
+        extra="ignore",
     )
+
+    # --- Derived helpers ----------------------------------------------------
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV == "production"
+
+    @property
+    def is_testing(self) -> bool:
+        return self.APP_ENV == "testing"
+
+    @property
+    def cors_allow_origins(self) -> list[str]:
+        return _split_csv(self.CORS_ALLOW_ORIGINS)
+
+    @property
+    def cors_allow_methods(self) -> list[str]:
+        return _split_csv(self.CORS_ALLOW_METHODS)
+
+    @property
+    def cors_allow_headers(self) -> list[str]:
+        return _split_csv(self.CORS_ALLOW_HEADERS)
+
+    # --- Field validation ---------------------------------------------------
+    @field_validator("APP_ENV")
+    @classmethod
+    def _validate_app_env(cls, value: str) -> str:
+        if value not in _APP_ENVIRONMENTS:
+            raise ValueError(f"APP_ENV must be one of {sorted(_APP_ENVIRONMENTS)}.")
+        return value
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def _validate_log_level(cls, value: str) -> str:
+        if value.upper() not in logging.getLevelNamesMapping():
+            raise ValueError("LOG_LEVEL must be a valid logging level (e.g. INFO, DEBUG).")
+        return value.upper()
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
@@ -54,6 +135,37 @@ class Settings(BaseSettings):
         if value <= 0:
             raise ValueError("JWT_EXPIRE_MINUTES must be a positive integer.")
         return value
+
+    # --- Production hardening ----------------------------------------------
+    @model_validator(mode="after")
+    def _validate_production(self) -> "Settings":
+        """Fail fast when production is missing security-critical configuration.
+
+        The core secrets (DATABASE_URL / OPENAI_API_KEY / JWT_SECRET_KEY) are
+        already required fields, so this focuses on the settings that are
+        optional in dev but mandatory in production.
+        """
+
+        if not self.is_production:
+            return self
+
+        missing = [
+            name
+            for name, value in (
+                ("WHATSAPP_VERIFY_TOKEN", self.WHATSAPP_VERIFY_TOKEN),
+                ("WHATSAPP_ACCESS_TOKEN", self.WHATSAPP_ACCESS_TOKEN),
+                ("WHATSAPP_PHONE_NUMBER_ID", self.WHATSAPP_PHONE_NUMBER_ID),
+            )
+            if not value
+        ]
+
+        if missing:
+            raise ValueError(
+                "The following settings are required when APP_ENV=production: "
+                + ", ".join(missing)
+            )
+
+        return self
 
 
 settings = Settings()

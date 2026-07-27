@@ -96,6 +96,68 @@ User ──1:N──> Contract ──1:N──> Payment
   (with duration), giving a durable trace of every message processed.
 - Secrets (passwords, JWT secret, access tokens, API keys) are never logged.
 
+## Production request flow
+
+```
+Client
+  │  (TLS-terminating proxy / load balancer)
+  │   forwards X-Forwarded-For + X-Request-ID
+  ▼
+FastAPI app (uvicorn, non-root container)
+  • CORS middleware (origins from settings)
+  • request-id middleware  → sets correlation id (from header or generated)
+  • rate-limit dependency  → 429 RATE_LIMITED on auth/webhook abuse (per IP)
+  • auth dependency        → 401 UNAUTHORIZED without a valid JWT
+  • router → service → repository → Postgres (pooled: pre-ping + recycle)
+  • standardized error envelope on any failure
+  ▲
+  └── /health (liveness) and /ready (readiness: DB + config) drive orchestration
+```
+
+The API is served under `/api/v1` (legacy unversioned paths kept for
+compatibility); `/health`, `/ready`, `/webhook` and `/` stay unversioned.
+
+## Scheduler lifecycle
+
+The background reminder scheduler's lifetime is bound to the app process via a
+FastAPI **lifespan** (`app/main.py`), so there is no global unmanaged instance:
+
+```
+app startup ──▶ lifespan enter ──▶ start_scheduler()
+                                      │  skipped if APP_ENV=testing or
+                                      │  SCHEDULER_ENABLED=false
+                                      │  start failure is logged, app stays up
+                                      ▼
+                              APScheduler running (single process, one job)
+                                 CronTrigger(hour, minute)
+                                 max_instances=1, coalesce=True,
+                                 misfire_grace_time=SCHEDULER_MISFIRE_GRACE_TIME
+                                      │
+app shutdown ─▶ lifespan exit ─▶ shutdown_scheduler()  (clean stop, wait=False)
+```
+
+Each fire runs `send_daily_reminders`, which mints its own `correlation_id`,
+creates a `SchedulerRun`, and logs `scheduler_run_started` /
+`scheduler_run_completed` with `scheduler_run_id`, `duration_ms`,
+`processed_contract_count`, `success_count` and `failed_count`.
+
+## Failure recovery flow
+
+- **A single contract fails** → recorded as a `FAILED` `SchedulerEvent`; the run
+  continues with the remaining contracts (`failed_count` incremented).
+- **The whole run fails** (e.g. can't fetch contracts) → the `SchedulerRun` is
+  marked `FAILED` with `completed_at` set, the exception is logged, and it
+  re-raises to APScheduler — the application process stays alive.
+- **App was down over a scheduled fire** → `coalesce=True` + `misfire_grace_time`
+  mean at most **one** catch-up run fires within the grace window, never a burst.
+- **Dropped DB connections** → `pool_pre_ping=True` transparently re-establishes
+  a connection; `pool_recycle` retires connections before the server times them
+  out.
+- **Inbound webhook retries** → idempotency via `ProcessedMessage`; a failed run
+  is not marked processed, so Meta's retry can safely reprocess it.
+- **Unexpected exceptions** → masked as a `500 INTERNAL_SERVER_ERROR` envelope
+  (internals never leaked); full traceback logged with the correlation id.
+
 ## Database indexes
 
 `alembic/versions/e6f7a8b9c0d1_add_performance_indexes.py` adds indexes on the

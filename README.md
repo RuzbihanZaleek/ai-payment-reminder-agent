@@ -356,18 +356,57 @@ See [`.env.example`](.env.example). Summary:
 
 | Variable | Required | Default | Notes |
 | --- | --- | --- | --- |
+| `APP_ENV` | no | `development` | `development` / `testing` / `production` |
+| `LOG_LEVEL` | no | `INFO` | any Python logging level |
+| `DEBUG` | no | `false` | |
+| `ENABLE_DOCS` | no | `true` | set `false` to hide `/docs`, `/redoc`, `/openapi.json` |
 | `DATABASE_URL` | yes | — | SQLAlchemy URL |
+| `DB_POOL_SIZE` | no | `5` | server DBs only |
+| `DB_MAX_OVERFLOW` | no | `10` | |
+| `DB_POOL_RECYCLE` | no | `1800` | seconds |
+| `DB_POOL_PRE_PING` | no | `true` | detect dropped connections |
+| `DB_ECHO` | no | `false` | log SQL |
 | `OPENAI_API_KEY` | yes | — | |
 | `OPENAI_MODEL` | no | `gpt-5.5` | |
 | `JWT_SECRET_KEY` | yes | — | **≥ 32 chars** (validated at startup) |
 | `JWT_ALGORITHM` | no | `HS256` | one of HS256/HS384/HS512 |
 | `JWT_EXPIRE_MINUTES` | no | `60` | must be > 0 |
-| `WHATSAPP_VERIFY_TOKEN` | no | `""` | needed to accept inbound webhooks |
-| `WHATSAPP_ACCESS_TOKEN` | no | `""` | needed to send messages |
-| `WHATSAPP_PHONE_NUMBER_ID` | no | `""` | |
+| `WHATSAPP_VERIFY_TOKEN` | prod | `""` | **required in production** |
+| `WHATSAPP_ACCESS_TOKEN` | prod | `""` | **required in production** |
+| `WHATSAPP_PHONE_NUMBER_ID` | prod | `""` | **required in production** |
 | `WHATSAPP_API_VERSION` | no | `v25.0` | |
+| `CORS_ALLOW_ORIGINS` | no | `*` | comma-separated; lock down in prod |
+| `CORS_ALLOW_METHODS` | no | `*` | comma-separated |
+| `CORS_ALLOW_HEADERS` | no | `*` | comma-separated |
+| `SCHEDULER_ENABLED` | no | `true` | |
+| `SCHEDULER_HOUR` / `SCHEDULER_MINUTE` | no | `9` / `0` | daily reminder time |
+| `SCHEDULER_MISFIRE_GRACE_TIME` | no | `3600` | seconds |
+| `RATE_LIMIT_ENABLED` | no | `true` | |
+| `RATE_LIMIT_LOGIN_PER_MINUTE` | no | `5` | per IP |
+| `RATE_LIMIT_REGISTER_PER_MINUTE` | no | `5` | per IP |
+| `RATE_LIMIT_WEBHOOK_PER_MINUTE` | no | `100` | |
 
-Invalid/missing required config fails fast at startup with a clear error.
+Invalid/missing required config fails fast at startup with a clear error. When
+`APP_ENV=production`, the three WhatsApp credentials become required and are
+validated at startup.
+
+### API versioning
+
+The application API is served under **`/api/v1`** (e.g. `/api/v1/auth/login`,
+`/api/v1/dashboard/overview`). The legacy unversioned paths (`/auth/login`, …)
+remain mounted for backwards compatibility. Operational/external endpoints
+(`/health`, `/ready`, `/webhook`, `/`) are intentionally **unversioned**.
+Versioning re-mounts the same router objects under a prefix — no endpoint code
+is duplicated (`app/api/v1/__init__.py`).
+
+### Rate limiting
+
+`POST /auth/login`, `POST /auth/register` (5/min/IP) and `POST /webhook`
+(100/min) are protected by a per-IP sliding-window limiter
+(`app/core/rate_limit.py`). Over-limit requests get `429` with a `RATE_LIMITED`
+error envelope. The limiter is in-memory (process-local) and hidden behind a
+small `allow(...)` interface so it can be swapped for a Redis backend later
+without touching routers. It is disabled under `APP_ENV=testing`.
 
 ---
 
@@ -389,6 +428,84 @@ Production notes baked into the image / compose file:
 - The `.:/app` bind mount is a **dev convenience** — remove it for a real
   deployment so the image is the single source of truth.
 - Rebuild the image after changing `requirements.txt`.
+
+---
+
+## Production deployment
+
+A checklist for running this as a real SaaS backend.
+
+### 1. Environment setup
+
+- Set `APP_ENV=production`. This makes the WhatsApp credentials required and
+  validated at startup — a misconfigured deploy fails fast instead of half-working.
+- Provide a strong `JWT_SECRET_KEY` (≥ 32 chars; see secret management below).
+- Lock down `CORS_ALLOW_ORIGINS` to your front-end origins (never `*` with
+  credentials in production).
+- Consider `ENABLE_DOCS=false` to hide the interactive schema, and keep
+  `DEBUG=false`.
+- Tune the DB pool (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`) to your Postgres limits.
+
+### 2. Secret management
+
+- Never commit `.env` (it is git-ignored). Inject secrets via your platform's
+  secret store / environment (Docker/OS env vars override `.env`).
+- Generate the JWT secret with
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- Rotating `JWT_SECRET_KEY` invalidates all existing tokens (users re-login) —
+  rotate during a maintenance window.
+- Secrets are never logged (passwords, tokens, API keys are excluded by design).
+
+### 3. Migration process (run as an explicit deploy step)
+
+```bash
+docker compose exec app alembic current      # inspect current revision
+docker compose exec app alembic upgrade head # apply pending migrations
+```
+
+Migrations are **not** auto-run on startup. Apply them before routing traffic to
+a new build. Take a database backup first (below).
+
+### 4. Docker deployment
+
+```bash
+docker compose up -d --build
+docker compose exec app alembic upgrade head
+```
+
+The image runs as a non-root user, sets `restart: unless-stopped`, waits for
+Postgres health before starting, and defines a container `HEALTHCHECK`. Remove
+the `.:/app` bind mount from `docker-compose.yml` for production so the image is
+the single source of truth. Behind a proxy/load balancer, forward
+`X-Forwarded-For` (used for rate-limit keys) and `X-Request-ID` (log
+correlation).
+
+### 5. Health checks
+
+- Liveness probe → `GET /health` (no I/O; restart the container if it fails).
+- Readiness probe → `GET /ready` (checks DB + JWT/OpenAI/WhatsApp config; returns
+  `503` until ready — keep traffic away while not ready).
+
+### 6. Backup strategy
+
+- Postgres is the only stateful component (the `postgres_data` volume).
+- Schedule regular logical backups, e.g.
+  `docker compose exec postgres pg_dump -U postgres payment_reminder > backup.sql`.
+- Test restores periodically:
+  `docker compose exec -T postgres psql -U postgres payment_reminder < backup.sql`.
+- Always back up **before** running migrations.
+
+### 7. Rollback process
+
+1. Roll the application image back to the previous tag/build.
+2. If the new release included a migration, roll it back:
+   `docker compose exec app alembic downgrade -1` (every migration in this repo
+   has a tested `downgrade`). For destructive schema changes, restore from the
+   pre-migration backup instead.
+3. Re-run readiness (`/ready`) before restoring traffic.
+
+Because the scheduler uses `coalesce=True` + `misfire_grace_time`, a brief
+downtime during a deploy will **not** trigger a burst of catch-up reminder runs.
 
 ---
 
@@ -414,13 +531,17 @@ The suite favours fast unit tests, with a DB-backed integration layer.
 
 ```bash
 # Unit + integration tests that don't need Postgres (SQLite / fakes).
-# JWT_SECRET_KEY must be set (>= 32 chars) because Settings validates it.
-JWT_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))") \
-  pytest --ignore=tests/repositories -q     # add back individual repo tests as needed
+pytest --ignore=tests/repositories -q     # add back individual repo tests as needed
 
 # Full suite including Postgres-backed repository tests (inside the container):
-docker compose exec -e JWT_SECRET_KEY=$JWT_SECRET_KEY app pytest -q
+docker compose exec app pytest -q
 ```
+
+`tests/conftest.py` sets `APP_ENV=testing` (and a fallback `JWT_SECRET_KEY`)
+before the app is imported, so a plain `pytest` is deterministic: the background
+scheduler and rate limiting are disabled for the suite (no threads, no
+self-throttling). The dedicated scheduler and rate-limit tests temporarily flip
+`APP_ENV` to exercise the real (non-testing) behavior.
 
 - `tests/agents`, `tests/services`, `tests/schemas`, `tests/core` — unit tests
   with fakes (no DB).

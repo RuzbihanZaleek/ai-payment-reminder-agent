@@ -10,6 +10,7 @@ from app.repositories.contract_repository import ContractRepository
 from app.repositories.processed_message_repository import ProcessedMessageRepository
 from app.services.agent_execution_service import AgentExecutionService
 from app.services.conversation_memory_service import ConversationMemoryService
+from app.core.rate_limit import rate_limit_webhook
 from app.api.agent import get_agent_execution_service
 
 
@@ -106,7 +107,7 @@ def verify_webhook(
     raise HTTPException(status_code=403, detail="Invalid verification token")
 
 
-@router.post("/webhook")
+@router.post("/webhook", dependencies=[Depends(rate_limit_webhook)])
 def receive_webhook(
     payload: dict = Body(...),
     contract_repository: ContractRepository = Depends(get_contract_repository),

@@ -150,3 +150,34 @@ def test_create_scheduler_registers_daily_job():
 
     assert job is not None
     assert job.func is scheduler_module.send_daily_reminders
+
+
+def test_scheduler_run_emits_observability_fields(monkeypatch, caplog):
+    import logging
+
+    reminder_service = FakeReminderService([FakeContract(1), FakeContract(2)])
+    execution_service = FakeReminderExecutionService()
+
+    monkeypatch.setattr(
+        scheduler_module, "create_reminder_service", lambda: reminder_service
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "create_reminder_execution_service",
+        lambda: execution_service,
+    )
+    _install_tracking(monkeypatch)
+
+    caplog.set_level(logging.INFO)
+    scheduler_module.send_daily_reminders()
+
+    completed = next(
+        r for r in caplog.records if r.getMessage() == "scheduler_run_completed"
+    )
+
+    assert completed.scheduler_run_id == 1
+    assert hasattr(completed, "correlation_id")
+    assert hasattr(completed, "duration_ms")
+    assert completed.processed_contract_count == 2
+    assert completed.success_count == 2
+    assert completed.failed_count == 0
