@@ -1,4 +1,5 @@
 from app.models.scheduler_run import SchedulerRun
+from app.enums.scheduler_run_status import SchedulerRunStatus
 from app.repositories.scheduler_run_repository import SchedulerRunRepository
 from app.repositories.scheduler_event_repository import SchedulerEventRepository
 
@@ -27,4 +28,18 @@ class SchedulerReportingService:
         return {
             "run": run,
             "events": self.scheduler_event_repository.get_by_run_id(run_id),
+        }
+
+    def get_scheduler_stats(self) -> dict:
+
+        runs = self.scheduler_run_repository.get_all()
+
+        return {
+            "total_scheduler_runs": len(runs),
+            "successful_runs": sum(
+                1 for r in runs if r.status == SchedulerRunStatus.COMPLETED
+            ),
+            "failed_runs": sum(
+                1 for r in runs if r.status == SchedulerRunStatus.FAILED
+            ),
         }

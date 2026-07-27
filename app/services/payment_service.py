@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from app.models.payment import Payment
+from app.enums.approval_status import ApprovalStatus
 from app.repositories.payment_repository import PaymentRepository
 
 
@@ -8,12 +9,18 @@ class PaymentService:
 
     def __init__( self, repository: PaymentRepository ):
         self.repository = repository
-        
+
     def create_payment( self, payment: Payment ) -> Payment:
         return self.repository.create(payment)
-    
+
     def get_payment( self, payment_id: int ) -> Payment | None:
         return self.repository.get_by_id(payment_id)
+
+    def get_all_payments( self ) -> list[Payment]:
+        return self.repository.get_all()
+
+    def count_pending_approvals( self ) -> int:
+        return len(self.repository.get_by_approval_status(ApprovalStatus.PENDING))
     
     def get_contract_payments( self, contract_id: int ) -> list[Payment]:
         return self.repository.get_by_contract_id(contract_id)

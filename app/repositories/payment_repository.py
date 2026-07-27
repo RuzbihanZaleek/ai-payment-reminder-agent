@@ -14,7 +14,13 @@ class PaymentRepository:
         self.db.refresh(payment)
 
         return payment
-    
+
+    def get_all( self ) -> list[Payment]:
+        return (
+            self.db.query(Payment)
+            .all()
+        )
+
     def get_by_id( self, payment_id: int) -> Payment | None:
         return (
             self.db.query(Payment)

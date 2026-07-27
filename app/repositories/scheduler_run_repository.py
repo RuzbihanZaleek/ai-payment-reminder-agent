@@ -37,3 +37,9 @@ class SchedulerRunRepository:
             .limit(limit)
             .all()
         )
+
+    def get_all( self ) -> list[SchedulerRun]:
+        return (
+            self.db.query(SchedulerRun)
+            .all()
+        )

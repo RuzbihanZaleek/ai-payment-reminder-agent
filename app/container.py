@@ -35,6 +35,7 @@ from app.services.payment_reporting_service import PaymentReportingService
 from app.services.receipt_reporting_service import ReceiptReportingService
 from app.services.agent_reporting_service import AgentReportingService
 from app.services.scheduler_reporting_service import SchedulerReportingService
+from app.services.dashboard_service import DashboardService
 
 from app.agents.payment_message_agent import PaymentMessageAgent
 from app.agents.confidence_checker import ConfidenceChecker
@@ -358,4 +359,20 @@ def create_scheduler_reporting_service(
     return SchedulerReportingService(
         SchedulerRunRepository(db),
         SchedulerEventRepository(db),
+    )
+
+
+def create_dashboard_service(
+    db=None,
+) -> DashboardService:
+    """Compose the dashboard service from the existing reporting services."""
+
+    if db is None:
+        db = SessionLocal()
+
+    return DashboardService(
+        create_contract_reporting_service(db=db),
+        create_payment_reporting_service(db=db),
+        create_agent_reporting_service(db=db),
+        create_scheduler_reporting_service(db=db),
     )

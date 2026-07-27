@@ -1,4 +1,5 @@
 from app.models.agent_run import AgentRun
+from app.enums.agent_run_status import AgentRunStatus
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.agent_event_repository import AgentEventRepository
 
@@ -27,4 +28,18 @@ class AgentReportingService:
         return {
             "run": run,
             "events": self.agent_event_repository.get_by_run_id(run_id),
+        }
+
+    def get_agent_stats(self) -> dict:
+
+        runs = self.agent_run_repository.get_all()
+
+        return {
+            "total_agent_runs": len(runs),
+            "completed_runs": sum(
+                1 for r in runs if r.status == AgentRunStatus.COMPLETED
+            ),
+            "failed_runs": sum(
+                1 for r in runs if r.status == AgentRunStatus.FAILED
+            ),
         }

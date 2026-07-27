@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from app.models.contract import ContractStatus
 from app.services.contract_service import ContractService
 from app.services.payment_service import PaymentService
 
@@ -32,4 +35,30 @@ class ContractReportingService:
                 contract_id,
             ),
             "payment_count": len(payments),
+        }
+
+    def get_contract_stats(self) -> dict:
+
+        contracts = self.contract_service.get_all_contracts()
+
+        total_remaining_amount = sum(
+            (
+                self.payment_service.calculate_remaining_amount(
+                    contract.total_amount,
+                    contract.id,
+                )
+                for contract in contracts
+            ),
+            Decimal("0"),
+        )
+
+        return {
+            "total_contracts": len(contracts),
+            "active_contracts": sum(
+                1 for c in contracts if c.status == ContractStatus.ACTIVE
+            ),
+            "completed_contracts": sum(
+                1 for c in contracts if c.status == ContractStatus.COMPLETED
+            ),
+            "total_remaining_amount": total_remaining_amount,
         }
