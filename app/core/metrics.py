@@ -186,3 +186,22 @@ def record_proactive_risks_detected(count: int) -> None:
             amount=count,
             help="Risk signals detected by proactive financial analysis",
         )
+
+
+def record_ai_action_created() -> None:
+    metrics.inc("ai_action_created_total", help="AI write actions proposed")
+
+
+def record_ai_action_executed() -> None:
+    metrics.inc("ai_action_executed_total", help="AI write actions executed")
+
+
+def record_ai_action_cancelled() -> None:
+    metrics.inc("ai_action_cancelled_total", help="AI write actions cancelled")
+
+
+def record_ai_action_expired(count: int = 1) -> None:
+    if count > 0:
+        metrics.inc(
+            "ai_action_expired_total", amount=count, help="AI write actions expired"
+        )

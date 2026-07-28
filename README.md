@@ -471,6 +471,21 @@ cashflow, contract performance (overdue / near-completion), payment behaviour
 approval/balance rules); the tools/executor/LLM never calculate. Intent →
 insight-tool routing is deterministic in `AssistantToolExecutor`.
 
+**Agent actions (human-approved writes):** the assistant can execute a minimal,
+fixed set of write actions — **create contract, approve/reject payment, send
+reminders** — but *never immediately*. Every write is a two-step
+propose-then-confirm flow (`app/ai/actions/`): a WRITE intent creates a
+`PendingAction` (`PENDING_CONFIRMATION`, tenant-scoped, expires after
+`PENDING_ACTION_TIMEOUT_MINUTES`) and returns a confirmation prompt; only a
+YES/OK/confirm reply (handled deterministically) executes it — exactly once —
+by delegating to the existing `ContractService` / `PaymentApprovalService` /
+reminder workflow (no business logic in the agent). NO/cancel discards it.
+Replay is prevented (executed actions are never re-run), tenant isolation is
+enforced (you can only confirm your own actions), and a separate scheduler job
+(`cleanup_expired_pending_actions`, own advisory lock) expires stale proposals.
+Audit events: `AI_ACTION_CREATED/CONFIRMED/EXECUTED/CANCELLED/EXPIRED`. Editing
+and deleting contracts are intentionally **not** supported in V1.
+
 **Proactive intelligence & memory:** the assistant keeps user-scoped long-term
 memory (`app/services/ai_memory/` — preferences, goals, observed patterns, risk
 signals) extracted from conversation and loaded back into context on later

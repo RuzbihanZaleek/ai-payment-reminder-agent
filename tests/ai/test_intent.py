@@ -41,3 +41,30 @@ def test_parses_documented_example():
 def test_reference_entity():
     result = IntentDetectionResult(intent="CONTRACT_STATUS", contract_reference="INV001")
     assert result.contract_reference == "INV001"
+
+
+def test_action_intents_present():
+    values = {i.value for i in AssistantIntent}
+
+    # Phase 11.4 agent-action intents.
+    assert {
+        "CREATE_CONTRACT", "UPDATE_CONTRACT", "DELETE_CONTRACT",
+        "APPROVE_PAYMENT", "REJECT_PAYMENT", "SEND_REMINDERS",
+        "SHOW_PENDING_APPROVALS", "SHOW_CONTRACTS", "SHOW_PAYMENTS",
+        "CONFIRM_ACTION", "CANCEL_ACTION",
+    } <= values
+
+
+def test_create_contract_entities():
+    result = IntentDetectionResult(
+        intent="CREATE_CONTRACT", person="John", amount=1200, daily_amount=20
+    )
+    assert result.intent == AssistantIntent.CREATE_CONTRACT
+    assert result.person == "John"
+    assert result.amount == 1200
+    assert result.daily_amount == 20
+
+
+def test_payment_id_entity():
+    result = IntentDetectionResult(intent="APPROVE_PAYMENT", payment_id=5)
+    assert result.payment_id == 5

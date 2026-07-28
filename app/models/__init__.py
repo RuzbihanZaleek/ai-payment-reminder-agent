@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.notification_outbox import NotificationOutbox
 from app.models.audit_log import AuditLog
 from app.models.financial_memory import FinancialMemory
+from app.models.pending_action import PendingAction
 
 __all__ = [
     "User",
@@ -32,4 +33,5 @@ __all__ = [
     "NotificationOutbox",
     "AuditLog",
     "FinancialMemory",
+    "PendingAction",
 ]

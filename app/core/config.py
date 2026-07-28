@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     # from the reminder + notification-worker locks).
     PROACTIVE_ANALYSIS_LOCK_ID: int = 902_025_107
 
+    # --- AI agent actions (human-approved writes) --------------------------
+    # A proposed action must be confirmed within this window or it expires.
+    PENDING_ACTION_TIMEOUT_MINUTES: int = 15
+    PENDING_ACTION_CLEANUP_ENABLED: bool = True
+    PENDING_ACTION_CLEANUP_INTERVAL_SECONDS: int = 300
+    PENDING_ACTION_CLEANUP_LOCK_ID: int = 902_025_108
+
     # --- Rate limiting ------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5

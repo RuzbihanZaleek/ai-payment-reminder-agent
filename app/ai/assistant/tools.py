@@ -61,6 +61,7 @@ class AssistantToolExecutor:
         payment_insight_tool=None,
         scheduler_insight_tool=None,
         recommendation_tool=None,
+        approval_tool=None,
     ):
         self.contract_tool = contract_tool
         self.payment_tool = payment_tool
@@ -70,6 +71,7 @@ class AssistantToolExecutor:
         self.payment_insight_tool = payment_insight_tool
         self.scheduler_insight_tool = scheduler_insight_tool
         self.recommendation_tool = recommendation_tool
+        self.approval_tool = approval_tool
 
     def gather(self, intent_result: IntentDetectionResult, user_id: int) -> dict:
         """Return {"context": {...}, "tool_calls": [...]} for the given intent."""
@@ -78,12 +80,24 @@ class AssistantToolExecutor:
         context: dict = {}
         tool_calls: list[str] = []
 
-        # --- Phase 11.1: per-contract question answering --------------------
+        # --- Phase 11.1 + SHOW_CONTRACTS: per-contract answering ------------
         if intent in _SUMMARY_INTENTS or intent in (
             AssistantIntent.PAYMENT_HISTORY,
+            AssistantIntent.SHOW_CONTRACTS,
             AssistantIntent.UNKNOWN,
         ):
             return self._gather_contract_level(intent_result, user_id)
+
+        # --- Phase 11.4 read actions ----------------------------------------
+        if intent == AssistantIntent.SHOW_PAYMENTS:
+            self._add_payments(context, tool_calls, user_id)
+            return {"context": context, "tool_calls": tool_calls}
+
+        if intent == AssistantIntent.SHOW_PENDING_APPROVALS:
+            if self.approval_tool is not None:
+                context["pending_approvals"] = self.approval_tool.get_pending_approvals(user_id)
+                tool_calls.append("ApprovalTool.get_pending_approvals")
+            return {"context": context, "tool_calls": tool_calls}
 
         # --- Phase 11.2: insight intents ------------------------------------
         if intent in _FINANCIAL_INTENTS:

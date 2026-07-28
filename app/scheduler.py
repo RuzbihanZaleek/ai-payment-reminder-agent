@@ -25,6 +25,7 @@ from app.container import (
     create_proactive_financial_service,
     create_financial_memory_service,
     create_audit_service,
+    create_action_service,
 )
 from app.enums.scheduler_run_status import SchedulerRunStatus
 from app.models.scheduler_run import SchedulerRun
@@ -36,6 +37,7 @@ logger = get_logger(__name__)
 _JOB_ID = "send_daily_reminders"
 _NOTIFICATION_JOB_ID = "process_notification_outbox"
 _PROACTIVE_JOB_ID = "run_proactive_financial_analysis"
+_PENDING_ACTION_CLEANUP_JOB_ID = "cleanup_expired_pending_actions"
 
 
 def _open_scheduler_lock():
@@ -337,6 +339,51 @@ def _analyze_all_users(session):
     )
 
 
+def _open_pending_action_cleanup_lock():
+    """Open a dedicated session + advisory-lock service (overridable in tests)."""
+
+    session = SessionLocal()
+    return (
+        SchedulerLockService(session, settings.PENDING_ACTION_CLEANUP_LOCK_ID),
+        session,
+    )
+
+
+def cleanup_expired_pending_actions():
+    """Expire stale unconfirmed AI actions. Guarded by its own advisory lock.
+
+    Separate from the reminder/notification/proactive jobs. A failure is logged
+    but never propagates -- the scheduler keeps running.
+    """
+
+    lock_service, lock_session = _open_pending_action_cleanup_lock()
+
+    try:
+        if not lock_service.acquire():
+            logger.info(
+                "pending_action_cleanup_skipped_locked",
+                extra={"lock_id": settings.PENDING_ACTION_CLEANUP_LOCK_ID},
+            )
+            return
+
+        set_request_id(f"action-cleanup-{uuid.uuid4().hex}")
+
+        session = SessionLocal()
+        try:
+            expired = create_action_service(db=session).expire_stale()
+            logger.info(
+                "pending_action_cleanup_completed", extra={"expired_count": expired}
+            )
+        finally:
+            session.close()
+    except Exception:
+        logger.exception("pending_action_cleanup_failed")
+        default_alert_service.notify_error("Pending action cleanup failed")
+    finally:
+        lock_service.release()
+        lock_session.close()
+
+
 def create_scheduler() -> BackgroundScheduler:
     """Build a scheduler with the daily reminder job registered.
 
@@ -386,6 +433,19 @@ def create_scheduler() -> BackgroundScheduler:
                 seconds=settings.PROACTIVE_ANALYSIS_INTERVAL_SECONDS,
             ),
             id=_PROACTIVE_JOB_ID,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Independent cleanup of expired unconfirmed AI actions (own id, own lock).
+    if settings.PENDING_ACTION_CLEANUP_ENABLED:
+        scheduler.add_job(
+            cleanup_expired_pending_actions,
+            trigger=IntervalTrigger(
+                seconds=settings.PENDING_ACTION_CLEANUP_INTERVAL_SECONDS,
+            ),
+            id=_PENDING_ACTION_CLEANUP_JOB_ID,
             replace_existing=True,
             max_instances=1,
             coalesce=True,

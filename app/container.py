@@ -605,17 +605,48 @@ def create_proactive_financial_service(
     )
 
 
+def create_action_service(
+    db=None,
+):
+    """Compose the AI agent action service (human-approved writes)."""
+
+    from app.repositories.pending_action_repository import PendingActionRepository
+    from app.ai.actions import ActionService, ActionExecutor
+
+    if db is None:
+        db = SessionLocal()
+
+    payment_approval_service = create_payment_approval_service(db=db)
+
+    executor = ActionExecutor(
+        contract_service=create_contract_service(db=db),  # write path (audited)
+        payment_approval_service=payment_approval_service,
+        reminder_service=create_reminder_service(db=db),
+        reminder_execution_service=create_reminder_execution_service(db=db),
+    )
+
+    return ActionService(
+        PendingActionRepository(db),
+        executor,
+        payment_approval_service,
+        audit_service=create_audit_service(db=db),
+        timeout_minutes=settings.PENDING_ACTION_TIMEOUT_MINUTES,
+    )
+
+
 def create_assistant_service(
     db=None,
     llm=None,
 ):
-    """Compose the read-only AI financial assistant.
+    """Compose the AI financial assistant / agent.
 
-    ``llm`` defaults to the real OpenAI-backed assistant LLM, but can be injected
-    (e.g. in tests) to avoid a live API key.
+    Reads are answered directly; writes require explicit user confirmation via
+    the ActionService. ``llm`` defaults to the real OpenAI-backed assistant LLM,
+    but can be injected (e.g. in tests) to avoid a live API key.
     """
 
     from app.services.ai_memory import MemoryExtractionService
+    from app.ai.tools.approval_tool import ApprovalTool
 
     from app.ai.tools import (
         ContractTool,
@@ -669,6 +700,7 @@ def create_assistant_service(
         payment_insight_tool=PaymentInsightTool(payment_insight),
         scheduler_insight_tool=SchedulerInsightTool(scheduler_insight),
         recommendation_tool=RecommendationTool(recommendation),
+        approval_tool=ApprovalTool(create_payment_approval_service(db=db)),
     )
 
     if llm is None:
@@ -687,6 +719,7 @@ def create_assistant_service(
         audit_service=create_audit_service(db=db),
         financial_memory_service=financial_memory_service,
         memory_extraction_service=memory_extraction_service,
+        action_service=create_action_service(db=db),
     )
 
 
