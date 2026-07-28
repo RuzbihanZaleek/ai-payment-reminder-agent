@@ -5,7 +5,12 @@ from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.container import create_conversation_memory_service
+from app.container import (
+    create_conversation_memory_service,
+    create_message_router,
+    create_assistant_service,
+    create_whatsapp_notification_service,
+)
 from app.repositories.contract_repository import ContractRepository
 from app.repositories.processed_message_repository import ProcessedMessageRepository
 from app.services.agent_execution_service import AgentExecutionService
@@ -47,6 +52,26 @@ def get_conversation_memory_service():
         yield create_conversation_memory_service(db=db)
     finally:
         db.close()
+
+
+def get_message_router():
+
+    return create_message_router()
+
+
+def get_assistant_service():
+
+    db = SessionLocal()
+
+    try:
+        yield create_assistant_service(db=db)
+    finally:
+        db.close()
+
+
+def get_whatsapp_notification_service():
+
+    return create_whatsapp_notification_service()
 
 
 def _contract_summary(contract) -> dict:
@@ -118,6 +143,9 @@ def receive_webhook(
         get_conversation_memory_service
     ),
     service: AgentExecutionService = Depends(get_agent_execution_service),
+    message_router=Depends(get_message_router),
+    assistant_service=Depends(get_assistant_service),
+    notification_service=Depends(get_whatsapp_notification_service),
 ):
 
     extracted = _extract_message(payload)
@@ -154,41 +182,86 @@ def receive_webhook(
 
     # Conversation memory: load prior context (summary + recent messages)
     # before running the agent. The current message is only persisted on
-    # success, so a failed run leaves no conversation messages behind.
+    # success, so a failed run leaves no conversation messages behind. The AI
+    # assistant shares this same phone-keyed conversation.
     conversation = conversation_memory_service.get_or_create_conversation(phone)
     history = conversation_memory_service.get_history(conversation.id)
 
     try:
-        result = service.execute(
-            contract_id=primary_contract_id,
-            message_id=message_id,
-            message=body,
-            conversation_id=conversation.id,
-            conversation_history=history["messages"],
-            resolved_contracts=resolved_contracts,
-        )
+        # Route on the EXISTING payment detector: payments -> the unchanged
+        # payment workflow; everything else -> the AI assistant.
+        if message_router.is_payment(body, history["messages"]):
+            _run_payment_workflow(
+                service,
+                conversation_memory_service,
+                conversation,
+                message_id,
+                body,
+                primary_contract_id,
+                history,
+                resolved_contracts,
+            )
+        else:
+            _run_assistant(
+                assistant_service,
+                notification_service,
+                owner_user_id,
+                phone,
+                body,
+            )
     except Exception:
         # Never surface a non-200 to Meta; just record it for diagnosis.
         # A failed run is NOT marked processed, so Meta's retry can reprocess it.
-        logger.exception(
-            "Agent execution failed for message %s",
-            message_id,
-        )
+        logger.exception("whatsapp_message_processing_failed message_id=%s", message_id)
         return {"status": "error"}
 
-    # Only after a successful run: persist the user message and assistant reply.
+    # Only mark processed after a successful run.
+    processed_message_repository.create(message_id=message_id, source="whatsapp")
+
+    return {"status": "ok"}
+
+
+def _run_payment_workflow(
+    service,
+    conversation_memory_service,
+    conversation,
+    message_id,
+    body,
+    primary_contract_id,
+    history,
+    resolved_contracts,
+) -> None:
+    """The original payment path (UNCHANGED behaviour)."""
+
+    result = service.execute(
+        contract_id=primary_contract_id,
+        message_id=message_id,
+        message=body,
+        conversation_id=conversation.id,
+        conversation_history=history["messages"],
+        resolved_contracts=resolved_contracts,
+    )
+
     conversation_memory_service.store_user_message(conversation.id, body)
 
     if result is not None and result.generated_message is not None:
         conversation_memory_service.store_assistant_message(
-            conversation.id,
-            result.generated_message,
+            conversation.id, result.generated_message
         )
 
-    # Only mark processed after a successful run.
-    processed_message_repository.create(
-        message_id=message_id,
-        source="whatsapp",
-    )
 
-    return {"status": "ok"}
+def _run_assistant(
+    assistant_service,
+    notification_service,
+    owner_user_id,
+    phone,
+    body,
+) -> None:
+    """Non-payment path: the AI assistant, scoped to the owning user.
+
+    The assistant persists the turn itself (on the same phone-keyed
+    conversation); the webhook only delivers the reply over WhatsApp.
+    """
+
+    result = assistant_service.chat(owner_user_id, body, conversation_key=phone)
+    notification_service.send(phone, result["message"])

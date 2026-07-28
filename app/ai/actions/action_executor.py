@@ -55,10 +55,15 @@ class ActionExecutor:
         )
 
         contract = self.contract_service.create_contract(contract_create, user_id=user_id)
-        return {
-            "success": True,
-            "message": f"Contract {contract.reference_code} created successfully.",
-        }
+        # WhatsApp-friendly: short labelled lines, no markdown tables.
+        message = (
+            "Contract created successfully.\n\n"
+            f"Reference:\n{contract.reference_code}\n\n"
+            f"Customer:\n{contract.name}\n\n"
+            f"Total:\n{contract.total_amount}\n\n"
+            f"Daily Payment:\n{contract.daily_amount}"
+        )
+        return {"success": True, "message": message}
 
     def _approve_payment(self, user_id: int, payload: dict) -> dict:
         payment = self.payment_approval_service.approve_payment(

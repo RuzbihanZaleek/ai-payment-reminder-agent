@@ -70,3 +70,7 @@ class IntentDetectionResult(BaseModel):
         default=None,
         description="A specific payment id named in the message, if any.",
     )
+    phone: str | None = Field(
+        default=None,
+        description="A customer's WhatsApp phone number named in the conversation, if any.",
+    )

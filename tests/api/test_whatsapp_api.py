@@ -10,10 +10,42 @@ from app.api.whatsapp import (
     get_contract_repository,
     get_processed_message_repository,
     get_conversation_memory_service,
+    get_message_router,
+    get_assistant_service,
+    get_whatsapp_notification_service,
 )
 
 
 client = TestClient(app)
+
+
+class FakeRouter:
+    def __init__(self, is_payment=True):
+        self._is_payment = is_payment
+        self.calls = []
+
+    def is_payment(self, message, history=None):
+        self.calls.append(message)
+        return self._is_payment
+
+
+class FakeAssistant:
+    def __init__(self, message="AI reply"):
+        self.message = message
+        self.calls = []
+
+    def chat(self, user_id, message, conversation_key=None):
+        self.calls.append((user_id, message, conversation_key))
+        return {"message": self.message, "intent": "UNKNOWN"}
+
+
+class FakeWhatsAppNotification:
+    def __init__(self):
+        self.sent = []
+
+    def send(self, recipient, message):
+        self.sent.append((recipient, message))
+        return True
 
 
 class FakeConversation:
@@ -139,7 +171,14 @@ def _message_payload(
 @pytest.fixture
 def overrides():
 
-    def _install(contract_repository=None, service=None, processed_repository=None):
+    def _install(
+        contract_repository=None,
+        service=None,
+        processed_repository=None,
+        router=None,
+        assistant=None,
+        notification=None,
+    ):
         if contract_repository is not None:
             app.dependency_overrides[get_contract_repository] = (
                 lambda: contract_repository
@@ -159,6 +198,16 @@ def overrides():
         # Conversation memory is not the focus of these tests -> use a stub.
         app.dependency_overrides[get_conversation_memory_service] = (
             lambda: FakeConversationMemoryService()
+        )
+
+        # Router defaults to "payment" so existing payment tests are unchanged.
+        router = router or FakeRouter(is_payment=True)
+        app.dependency_overrides[get_message_router] = lambda: router
+        app.dependency_overrides[get_assistant_service] = (
+            lambda: assistant or FakeAssistant()
+        )
+        app.dependency_overrides[get_whatsapp_notification_service] = (
+            lambda: notification or FakeWhatsAppNotification()
         )
 
     yield _install
@@ -273,6 +322,48 @@ def test_execution_exception_still_returns_200(overrides):
 
     assert response.status_code == 200
     assert len(service.calls) == 1
+
+
+# --- Message routing (Phase 12.0) -------------------------------------------
+
+def test_payment_message_routes_to_payment_workflow(overrides):
+    repo = FakeContractRepository(contract=FakeContract(contract_id=7))
+    service = FakeService()
+    assistant = FakeAssistant()
+
+    overrides(
+        contract_repository=repo, service=service,
+        router=FakeRouter(is_payment=True), assistant=assistant,
+    )
+
+    response = client.post("/webhook", json=_message_payload(body="I paid 100"))
+
+    assert response.status_code == 200
+    assert len(service.calls) == 1   # payment workflow ran
+    assert assistant.calls == []      # assistant NOT invoked
+
+
+def test_non_payment_message_routes_to_assistant(overrides):
+    repo = FakeContractRepository(contract=FakeContract(contract_id=7, user_id=1))
+    service = FakeService()
+    assistant = FakeAssistant(message="You have 3 active contracts.")
+    notification = FakeWhatsAppNotification()
+
+    overrides(
+        contract_repository=repo, service=service,
+        router=FakeRouter(is_payment=False), assistant=assistant, notification=notification,
+    )
+
+    response = client.post(
+        "/webhook", json=_message_payload(phone="15559999999", body="How am I doing?")
+    )
+
+    assert response.status_code == 200
+    # Payment workflow NOT run; assistant handled it (scoped to owner user 1).
+    assert service.calls == []
+    assert assistant.calls == [(1, "How am I doing?", "15559999999")]
+    # The AI reply was delivered over WhatsApp to the sender.
+    assert notification.sent == [("15559999999", "You have 3 active contracts.")]
 
 
 # --- Tenant isolation (Phase 10.2) ------------------------------------------

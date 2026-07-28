@@ -7,10 +7,28 @@ from app.api.whatsapp import (
     get_contract_repository,
     get_processed_message_repository,
     get_conversation_memory_service,
+    get_message_router,
+    get_assistant_service,
+    get_whatsapp_notification_service,
 )
 
 
 client = TestClient(app)
+
+
+class _PaymentRouter:
+    def is_payment(self, message, history=None):
+        return True
+
+
+class _StubAssistant:
+    def chat(self, user_id, message, conversation_key=None):
+        return {"message": "ai", "intent": "UNKNOWN"}
+
+
+class _StubNotify:
+    def send(self, recipient, message):
+        return True
 
 
 class FakeContract:
@@ -99,6 +117,9 @@ def _install(contract_repo, processed_repo, service):
         lambda: FakeConversationMemoryService()
     )
     app.dependency_overrides[get_agent_execution_service] = lambda: service
+    app.dependency_overrides[get_message_router] = lambda: _PaymentRouter()
+    app.dependency_overrides[get_assistant_service] = lambda: _StubAssistant()
+    app.dependency_overrides[get_whatsapp_notification_service] = lambda: _StubNotify()
 
 
 def _payload(message_id="wamid.123"):

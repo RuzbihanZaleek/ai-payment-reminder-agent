@@ -80,6 +80,7 @@ def test_propose_create_contract(session):
 
     result = service.propose(7, ActionType.CREATE_CONTRACT, {
         "name": "John", "total_amount": 1200, "daily_amount": 20,
+        "whatsapp_chat_id": "94771234567",
     })
 
     assert result["created"] is True
@@ -97,11 +98,38 @@ def test_propose_create_contract_missing_params(session):
     assert service.get_latest_pending(7) is None
 
 
+def test_propose_create_contract_requires_valid_phone(session):
+    service = _service(session)
+
+    # All fields present but no phone -> rejected, no placeholder created.
+    missing = service.propose(7, ActionType.CREATE_CONTRACT, {
+        "name": "John", "total_amount": 1200, "daily_amount": 20,
+    })
+    assert missing["created"] is False
+    assert "phone number" in missing["message"]
+
+    # Invalid phone -> rejected.
+    invalid = service.propose(7, ActionType.CREATE_CONTRACT, {
+        "name": "John", "total_amount": 1200, "daily_amount": 20,
+        "whatsapp_chat_id": "123",
+    })
+    assert invalid["created"] is False
+
+    # Valid phone is normalized to digits in the stored payload.
+    ok = service.propose(7, ActionType.CREATE_CONTRACT, {
+        "name": "John", "total_amount": 1200, "daily_amount": 20,
+        "whatsapp_chat_id": "+94 77 123 4567",
+    })
+    assert ok["created"] is True
+    assert service.get_latest_pending(7).payload_json["whatsapp_chat_id"] == "94771234567"
+
+
 def test_propose_create_contract_invalid_amounts(session):
     service = _service(session)
     # daily > total violates the ContractCreate rule.
     result = service.propose(7, ActionType.CREATE_CONTRACT, {
         "name": "John", "total_amount": 100, "daily_amount": 200,
+        "whatsapp_chat_id": "94771234567",
     })
     assert result["created"] is False
     assert service.get_latest_pending(7) is None

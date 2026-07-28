@@ -6,7 +6,6 @@ delegates to existing domain services). Owns lifecycle + tenant scoping + audit;
 contains no business rules.
 """
 
-import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,6 +14,7 @@ from decimal import Decimal
 from pydantic import ValidationError
 
 from app.core.logger import get_logger
+from app.core.phone import is_valid_whatsapp_number, normalize_phone
 from app.schemas.contract import ContractCreate
 from app.models.pending_action import PendingAction
 from app.ai.actions.pending_action import ActionType, PendingActionStatus
@@ -72,17 +72,25 @@ class ActionService:
         name = params.get("name")
         total = params.get("total_amount")
         daily = params.get("daily_amount")
+        phone = params.get("whatsapp_chat_id")
 
         if not name or total is None or daily is None:
             return {
                 "message": "To create a contract I need the customer name, total "
-                "amount and daily amount (e.g. 'create a contract for John, total "
-                "1200, daily 20').",
+                "amount and daily amount.",
+                "created": False,
+            }
+
+        # A real WhatsApp number is mandatory -- never a placeholder.
+        if not phone or not is_valid_whatsapp_number(phone):
+            return {
+                "message": "I need a valid WhatsApp phone number for the customer "
+                "before I can create this contract.",
                 "created": False,
             }
 
         reference_code = f"AI-{uuid.uuid4().hex[:8].upper()}"
-        whatsapp_chat_id = params.get("whatsapp_chat_id") or self._slug(name)
+        whatsapp_chat_id = normalize_phone(phone)
 
         payload = {
             "name": name,
@@ -107,10 +115,11 @@ class ActionService:
 
         action = self._create(user_id, ActionType.CREATE_CONTRACT, payload)
         message = (
-            "I'm ready to create this contract:\n"
-            f"- Customer: {name}\n"
-            f"- Total: {total}\n"
-            f"- Daily: {daily}"
+            "I'm ready to create this contract.\n\n"
+            f"Customer:\n{name}\n\n"
+            f"Total:\n{total}\n\n"
+            f"Daily:\n{daily}\n\n"
+            f"WhatsApp:\n{whatsapp_chat_id}"
             + _CONFIRM_HINT
         )
         return {"message": message, "created": True, "action_id": action.id}
@@ -224,11 +233,6 @@ class ActionService:
             entity_id=pending.id,
             metadata=metadata,
         )
-
-    @staticmethod
-    def _slug(name: str) -> str:
-        slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
-        return f"ai-{slug}" if slug else "ai-customer"
 
     @staticmethod
     def _first_error(exc: ValidationError) -> str:

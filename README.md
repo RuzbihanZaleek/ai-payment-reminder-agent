@@ -644,6 +644,76 @@ correlation).
 Because the scheduler uses `coalesce=True` + `misfire_grace_time`, a brief
 downtime during a deploy will **not** trigger a burst of catch-up reminder runs.
 
+### 8. Scheduler deployment & scaling
+
+The app hosts four independent background jobs, each guarded by its **own**
+PostgreSQL advisory lock, so it is safe to run **multiple API replicas** — only
+one replica ever executes each job per tick:
+
+- `send_daily_reminders` (cron) — reminder delivery
+- `process_notification_outbox` (interval) — outbox → WhatsApp
+- `run_proactive_financial_analysis` (daily) — proactive advisor
+- `cleanup_expired_pending_actions` (interval) — expires unconfirmed AI actions
+
+Scaling guidance:
+- Scale API replicas horizontally behind a load balancer; forward
+  `X-Forwarded-For` (rate-limit keys) and `X-Request-ID` (log correlation).
+- The advisory locks make in-process schedulers safe, but every replica still
+  wakes each tick to contend. To isolate background work, run one replica (or a
+  dedicated worker deployment) with the jobs enabled and set the job-enable
+  flags to `false` on the web replicas.
+- Rate limiting and metrics are **per-process/in-memory**; behind multiple
+  replicas each instance limits independently and exposes its own `/metrics`
+  (a Prometheus server aggregates). Swap the rate-limit backend for Redis before
+  relying on strict global limits.
+
+### 9. Recovery procedures
+
+- **Stuck notifications** (worker crashed mid-send): self-heal — the worker
+  re-queues `PROCESSING` rows older than `NOTIFICATION_PROCESSING_TIMEOUT_MINUTES`.
+- **Failed notifications**: `GET /admin/notifications/failed`, then
+  `POST /admin/notifications/{id}/retry` or `/discard`.
+- **Expired AI actions**: cleaned automatically; a user simply re-issues the
+  request.
+- **DB connection drops**: `pool_pre_ping` transparently reconnects.
+
+### 10. Monitoring
+
+- Liveness `GET /health`; readiness `GET /ready` (DB + config).
+- Scrape `GET /metrics` (Prometheus text) on every replica. Alert on rising
+  `notification_outbox_failed_total`, growing `notification_queue_size`, and any
+  `alert_error` log event.
+- Structured JSON logs carry `request_id`/correlation ids; audit trail in
+  `audit_logs`.
+
+---
+
+## Version 1 launch checklist
+
+WhatsApp integration (Phase 12.0): the webhook routes each inbound message —
+payments go to the **unchanged** payment workflow, everything else to the AI
+assistant (same phone-keyed conversation). AI-created contracts require a real
+WhatsApp number (collected in-conversation; no placeholders).
+
+Before going live:
+
+- [ ] `APP_ENV=production` (enforces WhatsApp creds + secure JWT at startup).
+- [ ] Strong `JWT_SECRET_KEY` (≥ 32 chars), real `OPENAI_API_KEY`, real
+      `WHATSAPP_VERIFY_TOKEN` / `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID`.
+- [ ] `CORS_ALLOW_ORIGINS` locked to your front-end origins (never `*`).
+- [ ] `DEBUG=false`; decide `ENABLE_DOCS`.
+- [ ] Meta webhook configured to `POST /webhook`; verify GET handshake with the
+      verify token.
+- [ ] `alembic upgrade head` applied; DB backup taken first.
+- [ ] Health/readiness probes wired; `/metrics` scraped.
+- [ ] Background jobs enabled on exactly one replica/worker (or accept lock
+      contention); confirm each job's lock id is unique.
+- [ ] `NOTIFICATION_MODE` chosen (`direct` or `outbox`; outbox needs the worker
+      enabled).
+- [ ] Review the identity model for WhatsApp AI access (see production risks) —
+      confirm it fits your customer/lender model before enabling AI **write**
+      actions over WhatsApp.
+
 ---
 
 ## Database migrations

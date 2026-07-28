@@ -86,18 +86,47 @@ def _service(llm=None, action=None):
 def test_write_intent_proposes_only():
     llm = StubLLM()
     llm.next = IntentDetectionResult(
-        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200, daily_amount=20
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200,
+        daily_amount=20, phone="94771234567",
     )
     action = FakeActionService()
     service = _service(llm, action)
 
-    result = service.chat(7, "Create a contract for John, 1200 total, 20 daily")
+    result = service.chat(7, "Create a contract for John, 1200 total, 20 daily, 94771234567")
 
     assert result["intent"] == "CREATE_CONTRACT"
     assert "proposed CREATE_CONTRACT" in result["message"]
     # Proposed, NOT executed.
     assert action.proposed and action.proposed[0][0] == ActionType.CREATE_CONTRACT
     assert action.confirmed == 0
+
+
+def test_create_contract_collects_missing_fields():
+    action = FakeActionService()
+    llm = StubLLM()
+    service = _service(llm, action)
+
+    # Only the name so far -> asks for the total, proposes nothing.
+    llm.next = IntentDetectionResult(intent=AssistantIntent.CREATE_CONTRACT, person="John")
+    r1 = service.chat(7, "create a contract for John")
+    assert "total" in r1["message"].lower()
+    assert action.proposed == []
+
+    # Name + total + daily but no phone -> asks for the WhatsApp number.
+    llm.next = IntentDetectionResult(
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200, daily_amount=20
+    )
+    r2 = service.chat(7, "1200 total 20 daily")
+    assert "whatsapp number" in r2["message"].lower()
+    assert action.proposed == []
+
+    # All fields incl. phone -> proposes.
+    llm.next = IntentDetectionResult(
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200,
+        daily_amount=20, phone="94771234567",
+    )
+    r3 = service.chat(7, "94771234567")
+    assert action.proposed and action.proposed[0][0] == ActionType.CREATE_CONTRACT
 
 
 def test_bare_yes_confirms_pending_without_llm():
@@ -165,11 +194,12 @@ def test_conversation_continuation_propose_then_confirm():
     llm = StubLLM()
     service = _service(llm, action)
 
-    # Turn 1: propose.
+    # Turn 1: propose (all fields incl. phone present).
     llm.next = IntentDetectionResult(
-        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1000, daily_amount=10
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1000,
+        daily_amount=10, phone="94771234567",
     )
-    service.chat(7, "create a contract for John 1000 total 10 daily")
+    service.chat(7, "create a contract for John 1000 total 10 daily 94771234567")
     assert action.pending is not None
 
     # Turn 2: bare YES confirms the surviving pending action.

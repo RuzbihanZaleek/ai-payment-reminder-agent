@@ -605,6 +605,35 @@ def create_proactive_financial_service(
     )
 
 
+def create_whatsapp_notification_service():
+    """Compose the WhatsApp notification service from settings."""
+
+    return WhatsAppNotificationService(
+        access_token=settings.WHATSAPP_ACCESS_TOKEN,
+        phone_number_id=settings.WHATSAPP_PHONE_NUMBER_ID,
+        api_version=settings.WHATSAPP_API_VERSION,
+        max_retries=settings.WHATSAPP_MAX_RETRIES,
+        retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
+        timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
+    )
+
+
+def create_message_router(llm=None):
+    """Compose the WhatsApp message router (reuses the payment detector).
+
+    ``llm`` defaults to the real OpenAI client but can be injected in tests.
+    """
+
+    from app.services.message_router_service import MessageRouterService
+
+    if llm is None:
+        from app.llm.client import OpenAIClient
+
+        llm = OpenAIClient()
+
+    return MessageRouterService(PaymentMessageAgent(llm))
+
+
 def create_action_service(
     db=None,
 ):

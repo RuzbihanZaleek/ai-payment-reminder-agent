@@ -61,9 +61,12 @@ class AssistantService:
     def _conversation_key(user_id: int) -> str:
         return f"assistant:user:{user_id}"
 
-    def chat(self, user_id: int, message: str) -> dict:
+    def chat(self, user_id: int, message: str, conversation_key: str | None = None) -> dict:
+        # Over WhatsApp the caller passes the sender's phone-keyed conversation so
+        # the agent shares one conversation/history with the payment flow (no new
+        # state mechanism). HTTP callers use the default per-user key.
         conversation = self.conversation_memory_service.get_or_create_conversation(
-            self._conversation_key(user_id)
+            conversation_key or self._conversation_key(user_id)
         )
 
         # History is loaded BEFORE the current turn is stored.
@@ -159,17 +162,47 @@ class AssistantService:
         action_type = _WRITE_INTENTS[intent]
 
         if action_type == ActionType.CREATE_CONTRACT:
-            params = {
-                "name": intent_result.person,
-                "total_amount": intent_result.amount,
-                "daily_amount": intent_result.daily_amount,
-            }
-        elif action_type in (ActionType.APPROVE_PAYMENT, ActionType.REJECT_PAYMENT):
+            return self._collect_and_propose_contract(user_id, intent_result)
+
+        if action_type in (ActionType.APPROVE_PAYMENT, ActionType.REJECT_PAYMENT):
             params = {"payment_id": intent_result.payment_id}
         else:
             params = {}
 
         return self.action_service.propose(user_id, action_type, params)["message"]
+
+    def _collect_and_propose_contract(self, user_id: int, intent_result) -> str:
+        """Ask for the next missing required field, or propose once complete.
+
+        Multi-turn state IS the conversation history (the LLM re-extracts every
+        field that has appeared so far) -- there is no separate state store.
+        """
+
+        name = intent_result.person
+        total = intent_result.amount
+        daily = intent_result.daily_amount
+        phone = intent_result.phone
+
+        if not name:
+            return "What is the customer's name?"
+        if total is None:
+            return "What is the total contract amount?"
+        if daily is None:
+            return "What is the daily payment amount?"
+        if not phone:
+            return f"What is {name}'s WhatsApp number?"
+
+        result = self.action_service.propose(
+            user_id,
+            ActionType.CREATE_CONTRACT,
+            {
+                "name": name,
+                "total_amount": total,
+                "daily_amount": daily,
+                "whatsapp_chat_id": phone,
+            },
+        )
+        return result["message"]
 
     def _load_memories(self, user_id: int) -> list:
         if self.financial_memory_service is None:
