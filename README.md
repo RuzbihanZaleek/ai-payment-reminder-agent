@@ -688,6 +688,38 @@ Scaling guidance:
 
 ---
 
+## WhatsApp Version 1 security model
+
+WhatsApp senders are **not authenticated users** — their identity is only
+derived from the contract they're associated with. So Version 1 deliberately
+limits what WhatsApp can do:
+
+**WhatsApp users can:**
+- Submit payment messages (→ the unchanged payment workflow).
+- Ask read-only financial questions (balance, payment history, contract status,
+  next payment, general queries, and financial insights) — answered by the AI
+  assistant using the insight services and conversation memory.
+
+**WhatsApp users cannot** (blocked by `WhatsAppAuthorizationService`):
+- Create contracts, approve/reject payments, send reminders, or confirm any
+  pending write. These are rejected with a message pointing to the app, and the
+  attempt is audited (`WHATSAPP_ACTION_BLOCKED`, with a masked phone — never the
+  full number or any secret). No `PendingAction`/contract/payment/reminder is
+  created.
+
+**Authenticated application users** (JWT via `/assistant/chat`, `/advisor/analyze`
+and the REST APIs) retain **full** capability, including AI contract-creation
+proposals and payment approvals — because JWT establishes a verified user
+identity and tenant scope.
+
+Authorization decisions live in `WhatsAppAuthorizationService` (a guard the
+assistant consults per WhatsApp turn), not in the webhook/router/assistant
+logic. A **future version** may introduce a verified WhatsApp-identity mapping
+(e.g. linking a lender's verified phone to their account), at which point
+selected write actions could be safely enabled over WhatsApp.
+
+---
+
 ## Version 1 launch checklist
 
 WhatsApp integration (Phase 12.0): the webhook routes each inbound message —
@@ -710,9 +742,9 @@ Before going live:
       contention); confirm each job's lock id is unique.
 - [ ] `NOTIFICATION_MODE` chosen (`direct` or `outbox`; outbox needs the worker
       enabled).
-- [ ] Review the identity model for WhatsApp AI access (see production risks) —
-      confirm it fits your customer/lender model before enabling AI **write**
-      actions over WhatsApp.
+- [ ] WhatsApp AI **write** actions are disabled by default (V1 security model);
+      confirm this policy fits your model. Lender writes are available only via
+      the authenticated app (JWT).
 
 ---
 

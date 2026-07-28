@@ -634,6 +634,19 @@ def create_message_router(llm=None):
     return MessageRouterService(PaymentMessageAgent(llm))
 
 
+def create_whatsapp_authorization_service(db=None):
+    """Compose the WhatsApp action-authorization guard (denies lender writes)."""
+
+    from app.services.whatsapp_authorization_service import (
+        WhatsAppAuthorizationService,
+    )
+
+    if db is None:
+        db = SessionLocal()
+
+    return WhatsAppAuthorizationService(audit_service=create_audit_service(db=db))
+
+
 def create_action_service(
     db=None,
 ):

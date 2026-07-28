@@ -10,6 +10,7 @@ from app.container import (
     create_message_router,
     create_assistant_service,
     create_whatsapp_notification_service,
+    create_whatsapp_authorization_service,
 )
 from app.repositories.contract_repository import ContractRepository
 from app.repositories.processed_message_repository import ProcessedMessageRepository
@@ -72,6 +73,16 @@ def get_assistant_service():
 def get_whatsapp_notification_service():
 
     return create_whatsapp_notification_service()
+
+
+def get_whatsapp_authorization_service():
+
+    db = SessionLocal()
+
+    try:
+        yield create_whatsapp_authorization_service(db=db)
+    finally:
+        db.close()
 
 
 def _contract_summary(contract) -> dict:
@@ -146,6 +157,7 @@ def receive_webhook(
     message_router=Depends(get_message_router),
     assistant_service=Depends(get_assistant_service),
     notification_service=Depends(get_whatsapp_notification_service),
+    whatsapp_authorization_service=Depends(get_whatsapp_authorization_service),
 ):
 
     extracted = _extract_message(payload)
@@ -205,6 +217,7 @@ def receive_webhook(
             _run_assistant(
                 assistant_service,
                 notification_service,
+                whatsapp_authorization_service,
                 owner_user_id,
                 phone,
                 body,
@@ -253,15 +266,22 @@ def _run_payment_workflow(
 def _run_assistant(
     assistant_service,
     notification_service,
+    whatsapp_authorization_service,
     owner_user_id,
     phone,
     body,
 ) -> None:
     """Non-payment path: the AI assistant, scoped to the owning user.
 
-    The assistant persists the turn itself (on the same phone-keyed
-    conversation); the webhook only delivers the reply over WhatsApp.
+    A WhatsApp authorization guard is supplied so lender-side WRITE actions are
+    rejected on this channel (reads/payments are unaffected). The assistant
+    persists the turn itself; the webhook only delivers the reply over WhatsApp.
     """
 
-    result = assistant_service.chat(owner_user_id, body, conversation_key=phone)
+    def authorize(intent):
+        return whatsapp_authorization_service.authorize(phone, intent)
+
+    result = assistant_service.chat(
+        owner_user_id, body, conversation_key=phone, action_authorizer=authorize
+    )
     notification_service.send(phone, result["message"])

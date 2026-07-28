@@ -31,6 +31,7 @@ class AuditService:
     AI_ACTION_CANCELLED = "AI_ACTION_CANCELLED"
     AI_ACTION_EXECUTED = "AI_ACTION_EXECUTED"
     AI_ACTION_EXPIRED = "AI_ACTION_EXPIRED"
+    WHATSAPP_ACTION_BLOCKED = "WHATSAPP_ACTION_BLOCKED"
 
     def __init__(self, repository: AuditLogRepository):
         self.repository = repository

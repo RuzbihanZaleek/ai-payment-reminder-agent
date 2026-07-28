@@ -20,3 +20,14 @@ def is_valid_whatsapp_number(raw: str) -> bool:
 
     digits = normalize_phone(raw)
     return 8 <= len(digits) <= 15
+
+
+def mask_phone(raw: str) -> str:
+    """Mask a phone for logs/audit -- keep only the last 4 digits."""
+
+    digits = normalize_phone(raw)
+    if not digits:
+        return "****"
+    if len(digits) <= 4:
+        return "*" * len(digits)
+    return "*" * (len(digits) - 4) + digits[-4:]

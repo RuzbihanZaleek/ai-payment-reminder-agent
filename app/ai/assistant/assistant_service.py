@@ -36,6 +36,12 @@ _UNSUPPORTED_INTENTS = {
     AssistantIntent.DELETE_CONTRACT,
 }
 
+# Shown when a WhatsApp sender attempts a lender-side write action (V1 policy).
+_WHATSAPP_WRITE_DENIED_MESSAGE = (
+    "That action is only available in the authenticated app. Over WhatsApp I can "
+    "answer questions about your payments and contracts."
+)
+
 
 class AssistantService:
 
@@ -61,10 +67,19 @@ class AssistantService:
     def _conversation_key(user_id: int) -> str:
         return f"assistant:user:{user_id}"
 
-    def chat(self, user_id: int, message: str, conversation_key: str | None = None) -> dict:
+    def chat(
+        self,
+        user_id: int,
+        message: str,
+        conversation_key: str | None = None,
+        action_authorizer=None,
+    ) -> dict:
         # Over WhatsApp the caller passes the sender's phone-keyed conversation so
         # the agent shares one conversation/history with the payment flow (no new
         # state mechanism). HTTP callers use the default per-user key.
+        #
+        # ``action_authorizer`` (WhatsApp only) is a callable(intent)->decision that
+        # gates channel-restricted actions; JWT callers pass None (full access).
         conversation = self.conversation_memory_service.get_or_create_conversation(
             conversation_key or self._conversation_key(user_id)
         )
@@ -82,7 +97,7 @@ class AssistantService:
         tool_calls: list = []
 
         # 1. Deterministic YES/NO on a pending action (robust; no LLM call).
-        shortcut = self._confirmation_shortcut(user_id, message)
+        shortcut = self._confirmation_shortcut(user_id, message, action_authorizer)
         if shortcut is not None:
             response, intent_value = shortcut
         else:
@@ -90,7 +105,13 @@ class AssistantService:
             intent = intent_result.intent
             intent_value = intent.value
 
-            if self.action_service is not None and intent in _WRITE_INTENTS:
+            denied = self._deny_if_blocked(action_authorizer, intent)
+
+            if denied is not None:
+                # Authorization guard rejected this action for the channel. No
+                # PendingAction/contract/payment/reminder is created.
+                response = denied
+            elif self.action_service is not None and intent in _WRITE_INTENTS:
                 # WRITE: propose only -- never execute now.
                 response = self._propose_action(user_id, intent, intent_result)
             elif self.action_service is not None and intent == AssistantIntent.CONFIRM_ACTION:
@@ -139,7 +160,7 @@ class AssistantService:
 
         return {"message": response, "intent": intent_value}
 
-    def _confirmation_shortcut(self, user_id: int, message: str):
+    def _confirmation_shortcut(self, user_id: int, message: str, action_authorizer=None):
         """Handle a bare YES/NO reply against a pending action, or return None."""
 
         if self.action_service is None:
@@ -148,6 +169,10 @@ class AssistantService:
         normalized = message.strip().lower()
 
         if normalized in _CONFIRM_WORDS:
+            # Confirming triggers a write -- gate it through the channel guard.
+            denied = self._deny_if_blocked(action_authorizer, AssistantIntent.CONFIRM_ACTION)
+            if denied is not None:
+                return denied, AssistantIntent.CONFIRM_ACTION.value
             if self.action_service.get_latest_pending(user_id) is not None:
                 result = self.action_service.confirm_and_execute(user_id)
                 return result["message"], AssistantIntent.CONFIRM_ACTION.value
@@ -157,6 +182,19 @@ class AssistantService:
                 return result["message"], AssistantIntent.CANCEL_ACTION.value
 
         return None
+
+    @staticmethod
+    def _deny_if_blocked(action_authorizer, intent) -> str | None:
+        """Return a deny message if the channel guard rejects this intent, else None."""
+
+        if action_authorizer is None:
+            return None
+
+        decision = action_authorizer(intent)
+        if decision.get("allowed"):
+            return None
+
+        return _WHATSAPP_WRITE_DENIED_MESSAGE
 
     def _propose_action(self, user_id: int, intent, intent_result) -> str:
         action_type = _WRITE_INTENTS[intent]

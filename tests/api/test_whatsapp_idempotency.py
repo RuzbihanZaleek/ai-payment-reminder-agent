@@ -22,7 +22,7 @@ class _PaymentRouter:
 
 
 class _StubAssistant:
-    def chat(self, user_id, message, conversation_key=None):
+    def chat(self, user_id, message, conversation_key=None, action_authorizer=None):
         return {"message": "ai", "intent": "UNKNOWN"}
 
 

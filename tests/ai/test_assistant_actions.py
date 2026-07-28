@@ -189,6 +189,77 @@ def test_unsupported_write_intent():
     assert "isn't supported" in result["message"]
 
 
+# --- WhatsApp channel authorization (Phase 12.1) ----------------------------
+
+def _deny_writes():
+    from app.ai.assistant.intent import AssistantIntent as AI
+
+    blocked = {
+        AI.CREATE_CONTRACT, AI.UPDATE_CONTRACT, AI.DELETE_CONTRACT,
+        AI.APPROVE_PAYMENT, AI.REJECT_PAYMENT, AI.SEND_REMINDERS, AI.CONFIRM_ACTION,
+    }
+
+    def _authorize(intent):
+        if intent in blocked:
+            return {"allowed": False, "reason": "WHATSAPP_WRITE_ACTION_DISABLED"}
+        return {"allowed": True, "reason": None}
+
+    return _authorize
+
+
+def test_whatsapp_write_intent_is_blocked():
+    action = FakeActionService()
+    llm = StubLLM()
+    llm.next = IntentDetectionResult(
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200,
+        daily_amount=20, phone="94771234567",
+    )
+    service = _service(llm, action)
+
+    result = service.chat(7, "create a contract for John", action_authorizer=_deny_writes())
+
+    assert "authenticated app" in result["message"]
+    assert action.proposed == []  # no PendingAction created
+
+
+def test_whatsapp_read_intent_still_allowed():
+    action = FakeActionService()
+    llm = StubLLM()
+    llm.next = IntentDetectionResult(intent=AssistantIntent.BALANCE_QUERY, person="John")
+    service = _service(llm, action)
+
+    result = service.chat(7, "how much does John owe?", action_authorizer=_deny_writes())
+
+    # Read proceeds through the normal (LLM) path.
+    assert result["message"] == "read-answer"
+
+
+def test_whatsapp_confirm_is_blocked_even_with_pending():
+    action = FakeActionService()
+    action.pending = SimpleNamespace(id=1, action_type="SEND_REMINDERS")
+    service = _service(StubLLM(), action)
+
+    result = service.chat(7, "yes", action_authorizer=_deny_writes())
+
+    assert "authenticated app" in result["message"]
+    assert action.confirmed == 0  # not executed
+
+
+def test_jwt_write_still_works_without_authorizer():
+    action = FakeActionService()
+    llm = StubLLM()
+    llm.next = IntentDetectionResult(
+        intent=AssistantIntent.CREATE_CONTRACT, person="John", amount=1200,
+        daily_amount=20, phone="94771234567",
+    )
+    service = _service(llm, action)
+
+    # No authorizer (JWT channel) -> write proceeds to a proposal.
+    result = service.chat(7, "create a contract for John")
+
+    assert action.proposed and action.proposed[0][0] == ActionType.CREATE_CONTRACT
+
+
 def test_conversation_continuation_propose_then_confirm():
     action = FakeActionService()
     llm = StubLLM()

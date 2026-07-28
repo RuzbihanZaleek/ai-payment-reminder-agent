@@ -34,8 +34,9 @@ class FakeAssistant:
         self.message = message
         self.calls = []
 
-    def chat(self, user_id, message, conversation_key=None):
+    def chat(self, user_id, message, conversation_key=None, action_authorizer=None):
         self.calls.append((user_id, message, conversation_key))
+        self.authorizer = action_authorizer
         return {"message": self.message, "intent": "UNKNOWN"}
 
 
@@ -364,6 +365,83 @@ def test_non_payment_message_routes_to_assistant(overrides):
     assert assistant.calls == [(1, "How am I doing?", "15559999999")]
     # The AI reply was delivered over WhatsApp to the sender.
     assert notification.sent == [("15559999999", "You have 3 active contracts.")]
+
+
+def test_whatsapp_create_contract_request_is_rejected(overrides):
+    # End-to-end: a non-payment WRITE request over WhatsApp must be denied by the
+    # guard -- no PendingAction created, a deny message delivered.
+    from app.ai.assistant.assistant_service import AssistantService
+    from app.ai.assistant.intent import AssistantIntent, IntentDetectionResult
+    from app.services.whatsapp_authorization_service import WhatsAppAuthorizationService
+    from app.api.whatsapp import get_assistant_service, get_whatsapp_authorization_service
+
+    class _Mem:
+        def get_or_create_conversation(self, key):
+            return SimpleNamespace(id=1)
+
+        def get_recent_history(self, cid, limit=10):
+            return []
+
+        def store_user_message(self, cid, content):
+            pass
+
+        def store_assistant_message(self, cid, content):
+            pass
+
+    class _Tools:
+        def gather(self, intent_result, user_id):
+            return {"context": {}, "tool_calls": []}
+
+    class _LLM:
+        def detect_intent(self, message, history=None):
+            return IntentDetectionResult(
+                intent=AssistantIntent.CREATE_CONTRACT, person="John",
+                amount=1200, daily_amount=20, phone="94771234567",
+            )
+
+        def generate(self, *args):
+            return "n/a"
+
+    class _Actions:
+        def __init__(self):
+            self.proposed = []
+
+        def get_latest_pending(self, user_id):
+            return None
+
+        def propose(self, user_id, action_type, params):
+            self.proposed.append(action_type)
+            return {"message": "proposed", "created": True}
+
+        def confirm_and_execute(self, user_id):
+            return {"success": False, "message": "nothing"}
+
+        def cancel_latest(self, user_id):
+            return {"success": False, "message": "nothing"}
+
+    actions = _Actions()
+    real_assistant = AssistantService(_Mem(), _Tools(), _LLM(), action_service=actions)
+    notification = FakeWhatsAppNotification()
+
+    repo = FakeContractRepository(contract=FakeContract(contract_id=7, user_id=1))
+    overrides(
+        contract_repository=repo, service=FakeService(),
+        router=FakeRouter(is_payment=False), notification=notification,
+    )
+    app.dependency_overrides[get_assistant_service] = lambda: real_assistant
+    app.dependency_overrides[get_whatsapp_authorization_service] = (
+        lambda: WhatsAppAuthorizationService()
+    )
+
+    response = client.post(
+        "/webhook",
+        json=_message_payload(phone="15559999999", body="Create a contract for John"),
+    )
+
+    assert response.status_code == 200
+    assert actions.proposed == []                      # no write proposed
+    assert notification.sent                            # a reply was delivered
+    assert "authenticated app" in notification.sent[0][1]
 
 
 # --- Tenant isolation (Phase 10.2) ------------------------------------------
