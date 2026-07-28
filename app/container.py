@@ -531,6 +531,80 @@ def create_audit_service(
     return AuditService(AuditLogRepository(db))
 
 
+def create_financial_memory_service(
+    db=None,
+):
+    """Compose the long-term financial memory service."""
+
+    from app.repositories.financial_memory_repository import (
+        FinancialMemoryRepository,
+    )
+    from app.services.ai_memory import FinancialMemoryService
+
+    if db is None:
+        db = SessionLocal()
+
+    return FinancialMemoryService(
+        FinancialMemoryRepository(db),
+        audit_service=create_audit_service(db=db),
+    )
+
+
+def create_recommendation_service(
+    db=None,
+):
+    """Compose the RecommendationService (insight-service composer)."""
+
+    from app.services.insights import (
+        FinancialInsightService,
+        ContractInsightService,
+        PaymentInsightService,
+    )
+    from app.services.insights.recommendation_service import RecommendationService
+
+    if db is None:
+        db = SessionLocal()
+
+    contract_service = ContractService(ContractRepository(db))
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return RecommendationService(
+        FinancialInsightService(
+            contract_service, payment_service, create_contract_reporting_service(db=db)
+        ),
+        ContractInsightService(contract_service, payment_service),
+        PaymentInsightService(payment_service, contract_service),
+        audit_service=create_audit_service(db=db),
+    )
+
+
+def create_proactive_financial_service(
+    db=None,
+):
+    """Compose the proactive financial analysis service."""
+
+    from app.services.insights import (
+        FinancialInsightService,
+        ContractInsightService,
+        PaymentInsightService,
+    )
+    from app.services.proactive import ProactiveFinancialService
+
+    if db is None:
+        db = SessionLocal()
+
+    contract_service = ContractService(ContractRepository(db))
+    payment_service = PaymentService(PaymentRepository(db))
+
+    return ProactiveFinancialService(
+        FinancialInsightService(
+            contract_service, payment_service, create_contract_reporting_service(db=db)
+        ),
+        ContractInsightService(contract_service, payment_service),
+        PaymentInsightService(payment_service, contract_service),
+    )
+
+
 def create_assistant_service(
     db=None,
     llm=None,
@@ -540,6 +614,8 @@ def create_assistant_service(
     ``llm`` defaults to the real OpenAI-backed assistant LLM, but can be injected
     (e.g. in tests) to avoid a live API key.
     """
+
+    from app.services.ai_memory import MemoryExtractionService
 
     from app.ai.tools import (
         ContractTool,
@@ -600,11 +676,17 @@ def create_assistant_service(
 
         llm = OpenAIAssistantLLM()
 
+    # Phase 11.3: long-term financial memory + extraction.
+    financial_memory_service = create_financial_memory_service(db=db)
+    memory_extraction_service = MemoryExtractionService(financial_memory_service)
+
     return AssistantService(
         create_conversation_memory_service(db=db),
         tool_executor,
         llm,
         audit_service=create_audit_service(db=db),
+        financial_memory_service=financial_memory_service,
+        memory_extraction_service=memory_extraction_service,
     )
 
 

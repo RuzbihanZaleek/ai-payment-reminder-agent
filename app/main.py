@@ -25,6 +25,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.analytics import router as analytics_router
 from app.api.admin.notifications import router as admin_notifications_router
 from app.api.assistant import router as assistant_router
+from app.api.advisor import router as advisor_router
 
 logger = get_logger(__name__)
 
@@ -114,6 +115,7 @@ app.include_router(dashboard_router)
 app.include_router(analytics_router)
 app.include_router(admin_notifications_router)
 app.include_router(assistant_router)
+app.include_router(advisor_router)
 
 
 @app.get("/")

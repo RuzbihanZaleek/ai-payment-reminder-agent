@@ -162,3 +162,27 @@ def observe_notification_processing_duration(seconds: float) -> None:
         seconds,
         help="Time to deliver a single outbox notification",
     )
+
+
+def record_proactive_analysis_run() -> None:
+    metrics.inc(
+        "proactive_analysis_runs_total", help="Proactive financial analysis runs"
+    )
+
+
+def record_proactive_users_analyzed(count: int) -> None:
+    if count > 0:
+        metrics.inc(
+            "proactive_analysis_users_total",
+            amount=count,
+            help="Users analyzed by proactive financial analysis",
+        )
+
+
+def record_proactive_risks_detected(count: int) -> None:
+    if count > 0:
+        metrics.inc(
+            "proactive_analysis_risks_detected_total",
+            amount=count,
+            help="Risk signals detected by proactive financial analysis",
+        )

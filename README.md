@@ -471,6 +471,18 @@ cashflow, contract performance (overdue / near-completion), payment behaviour
 approval/balance rules); the tools/executor/LLM never calculate. Intent →
 insight-tool routing is deterministic in `AssistantToolExecutor`.
 
+**Proactive intelligence & memory:** the assistant keeps user-scoped long-term
+memory (`app/services/ai_memory/` — preferences, goals, observed patterns, risk
+signals) extracted from conversation and loaded back into context on later
+turns (so "he"/follow-ups resolve). `ProactiveFinancialService`
+(`app/services/proactive/`) detects risks (overdue, low collection, payment
+inconsistency) without being asked, reusing the insight services.
+`POST /advisor/analyze` (auth) returns `{summary, risks, recommendations}` via
+`RecommendationService.generate_personalized_recommendations`. A separate daily
+scheduler job (`run_proactive_financial_analysis`, own advisory lock) analyzes
+all users and records `RISK_SIGNAL` memories + audit. New audit events:
+`AI_MEMORY_CREATED`, `AI_PROACTIVE_ANALYSIS`, `AI_RECOMMENDATION_GENERATED`.
+
 ### Operations & recovery
 
 - **Stuck-message recovery** — the worker, on each run, returns any message

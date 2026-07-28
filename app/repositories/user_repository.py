@@ -28,3 +28,6 @@ class UserRepository:
             .filter(User.email == email)
             .first()
         )
+
+    def get_all( self ) -> list[User]:
+        return self.db.query(User).all()

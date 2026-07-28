@@ -28,11 +28,15 @@ class AssistantService:
         tool_executor: AssistantToolExecutor,
         llm,
         audit_service=None,
+        financial_memory_service=None,
+        memory_extraction_service=None,
     ):
         self.conversation_memory_service = conversation_memory_service
         self.tool_executor = tool_executor
         self.llm = llm
         self.audit_service = audit_service
+        self.financial_memory_service = financial_memory_service
+        self.memory_extraction_service = memory_extraction_service
 
     @staticmethod
     def _conversation_key(user_id: int) -> str:
@@ -48,6 +52,10 @@ class AssistantService:
             conversation.id, limit=_HISTORY_LIMIT
         )
 
+        # Relevant long-term financial memories (user-scoped -- never another
+        # user's memories).
+        memories = self._load_memories(user_id)
+
         start = time.perf_counter()
 
         intent_result = self.llm.detect_intent(message, history)
@@ -58,11 +66,14 @@ class AssistantService:
 
         gathered = self.tool_executor.gather(intent_result, user_id)
 
+        # The LLM sees history + relevant memories + real financial data.
+        context = {**gathered["context"], "financial_memories": memories}
+
         response = self.llm.generate(
             ASSISTANT_SYSTEM_PROMPT,
             message,
             history,
-            gathered["context"],
+            context,
         )
 
         duration_ms = int((time.perf_counter() - start) * 1000)
@@ -72,6 +83,9 @@ class AssistantService:
         self.conversation_memory_service.store_assistant_message(
             conversation.id, response
         )
+
+        # Extract any long-term memory worth keeping (preferences/patterns).
+        self._extract_memories(user_id, message, response)
 
         # Observability: intent, duration, and which tools ran (never the content).
         tool_calls = gathered["tool_calls"]
@@ -91,6 +105,20 @@ class AssistantService:
         )
 
         return {"message": response, "intent": intent.value}
+
+    def _load_memories(self, user_id: int) -> list:
+        if self.financial_memory_service is None:
+            return []
+        return self.financial_memory_service.get_relevant_memories(user_id)
+
+    def _extract_memories(self, user_id: int, message: str, response: str) -> None:
+        if self.memory_extraction_service is None:
+            return
+        # Memory extraction must never break the chat response.
+        try:
+            self.memory_extraction_service.extract(user_id, message, response)
+        except Exception:
+            logger.exception("memory_extraction_failed", extra={"user_id": user_id})
 
     def _audit(self, user_id: int, action: str, conversation_id: int, metadata: dict) -> None:
         if self.audit_service is None:

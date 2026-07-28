@@ -22,10 +22,12 @@ class RecommendationService:
         financial_insight_service: FinancialInsightService,
         contract_insight_service: ContractInsightService,
         payment_insight_service: PaymentInsightService,
+        audit_service=None,
     ):
         self.financial_insight_service = financial_insight_service
         self.contract_insight_service = contract_insight_service
         self.payment_insight_service = payment_insight_service
+        self.audit_service = audit_service
 
     def generate(self, user_id: int) -> list[str]:
         recommendations: list[str] = []
@@ -77,3 +79,45 @@ class RecommendationService:
                 )
 
         return recommendations
+
+    def generate_personalized_recommendations(self, user_id: int) -> dict:
+        """Advisor-style personalized output: health + positives + risks + actions.
+
+        Reuses the proactive analysis (built from the same insight services) for
+        health/positives/risks and the grounded recommendation lines for the
+        suggested actions -- no calculations are duplicated here.
+        """
+
+        # Imported lazily to avoid any import-order coupling; proactive depends
+        # only on insight services (no cycle).
+        from app.services.proactive.proactive_financial_service import (
+            ProactiveFinancialService,
+        )
+
+        analysis = ProactiveFinancialService(
+            self.financial_insight_service,
+            self.contract_insight_service,
+            self.payment_insight_service,
+        ).analyze(user_id)
+
+        result = {
+            "summary": analysis["summary"],
+            "financial_health": analysis["financial_health"],
+            "positives": analysis["positives"],
+            "risks": analysis["risks"],
+            "suggestions": self.generate(user_id),
+        }
+
+        if self.audit_service is not None:
+            self.audit_service.record(
+                action=self.audit_service.AI_RECOMMENDATION_GENERATED,
+                user_id=user_id,
+                entity_type="user",
+                entity_id=user_id,
+                metadata={
+                    "risk_count": len(result["risks"]),
+                    "suggestion_count": len(result["suggestions"]),
+                },
+            )
+
+        return result

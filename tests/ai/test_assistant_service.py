@@ -70,8 +70,32 @@ class FakeAudit:
         self.records.append(SimpleNamespace(action=action, user_id=user_id, metadata=metadata))
 
 
-def _service(memory, llm, context, audit=None):
-    return AssistantService(memory, FakeToolExecutor(context), llm, audit_service=audit)
+def _service(memory, llm, context, audit=None, financial_memory=None, extraction=None):
+    return AssistantService(
+        memory,
+        FakeToolExecutor(context),
+        llm,
+        audit_service=audit,
+        financial_memory_service=financial_memory,
+        memory_extraction_service=extraction,
+    )
+
+
+class FakeFinancialMemory:
+    def __init__(self, memories=None):
+        self._memories = memories or []
+
+    def get_relevant_memories(self, user_id, limit=10):
+        return self._memories
+
+
+class FakeExtraction:
+    def __init__(self):
+        self.calls = []
+
+    def extract(self, user_id, message, response):
+        self.calls.append((user_id, message, response))
+        return []
 
 
 def test_balance_query_end_to_end():
@@ -84,8 +108,10 @@ def test_balance_query_end_to_end():
 
     assert result["intent"] == "BALANCE_QUERY"
     assert result["message"] == "Remaining: 900"
-    # The tool context reached the LLM (no guessing).
-    assert llm.generate_calls[0]["context"] == context
+    # The tool context reached the LLM (no guessing); memories are added too.
+    sent = llm.generate_calls[0]["context"]
+    assert sent["contract_summaries"] == context["contract_summaries"]
+    assert sent["financial_memories"] == []
 
 
 def test_conversation_is_persisted_after_response():
@@ -118,6 +144,43 @@ def test_missing_data_yields_no_invention():
     result = service.chat(user_id=7, message="How much does John owe?")
 
     assert result["message"] == "I don't have that information."
+
+
+def test_relevant_memories_are_loaded_into_llm_context():
+    llm = KeywordLLM()
+    memories = [{"type": "USER_GOAL", "content": "wants monthly summaries"}]
+    service = _service(
+        FakeMemory(), llm, {"contract_summaries": []},
+        financial_memory=FakeFinancialMemory(memories),
+    )
+
+    service.chat(user_id=7, message="How am I doing?")
+
+    assert llm.generate_calls[0]["context"]["financial_memories"] == memories
+
+
+def test_memory_extraction_runs_after_response():
+    extraction = FakeExtraction()
+    service = _service(
+        FakeMemory(), KeywordLLM(), {"contract_summaries": []}, extraction=extraction
+    )
+
+    service.chat(user_id=7, message="I want monthly summaries")
+
+    assert extraction.calls
+    assert extraction.calls[0][0] == 7
+    assert extraction.calls[0][1] == "I want monthly summaries"
+
+
+def test_works_without_memory_services():
+    # No memory services wired -> still answers, context has empty memories.
+    llm = KeywordLLM()
+    service = _service(FakeMemory(), llm, {"contract_summaries": []})
+
+    result = service.chat(user_id=7, message="How much does John owe?")
+
+    assert result["intent"] == "BALANCE_QUERY"
+    assert llm.generate_calls[0]["context"]["financial_memories"] == []
 
 
 def test_observability_records_query_and_response():

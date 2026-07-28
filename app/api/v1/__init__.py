@@ -18,6 +18,7 @@ from app.api.dashboard import router as dashboard_router
 from app.api.analytics import router as analytics_router
 from app.api.admin.notifications import router as admin_notifications_router
 from app.api.assistant import router as assistant_router
+from app.api.advisor import router as advisor_router
 
 
 API_V1_PREFIX = "/api/v1"
@@ -36,6 +37,7 @@ _FEATURE_ROUTERS = [
     analytics_router,
     admin_notifications_router,
     assistant_router,
+    advisor_router,
 ]
 
 for _router in _FEATURE_ROUTERS:

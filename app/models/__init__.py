@@ -13,6 +13,7 @@ from app.models.payment_receipt import PaymentReceipt
 from app.models.user import User
 from app.models.notification_outbox import NotificationOutbox
 from app.models.audit_log import AuditLog
+from app.models.financial_memory import FinancialMemory
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "PaymentReceipt",
     "NotificationOutbox",
     "AuditLog",
+    "FinancialMemory",
 ]

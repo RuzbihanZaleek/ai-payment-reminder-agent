@@ -32,6 +32,7 @@ from app.services.insights import (
     SchedulerInsightService,
 )
 from app.services.insights.recommendation_service import RecommendationService
+from app.services.proactive import ProactiveFinancialService
 
 
 class InsightHarness:
@@ -56,6 +57,9 @@ class InsightHarness:
         self.payments = PaymentInsightService(self.payment_service, self.contract_service)
         self.scheduler = SchedulerInsightService(scheduler_reporting)
         self.recommendations = RecommendationService(
+            self.financial, self.contracts, self.payments
+        )
+        self.proactive = ProactiveFinancialService(
             self.financial, self.contracts, self.payments
         )
 

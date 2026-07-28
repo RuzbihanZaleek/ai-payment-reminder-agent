@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     # Emit an alert when a single worker pass fails at least this many messages.
     NOTIFICATION_FAILURE_ALERT_THRESHOLD: int = 10
 
+    # --- Proactive AI financial analysis -----------------------------------
+    PROACTIVE_ANALYSIS_ENABLED: bool = True
+    PROACTIVE_ANALYSIS_INTERVAL_SECONDS: int = 86_400  # daily
+    # Advisory-lock key so only one replica runs proactive analysis (distinct
+    # from the reminder + notification-worker locks).
+    PROACTIVE_ANALYSIS_LOCK_ID: int = 902_025_107
+
     # --- Rate limiting ------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
