@@ -21,6 +21,8 @@ class AuditService:
     CONTRACT_CREATED = "CONTRACT_CREATED"
     PAYMENT_APPROVED = "PAYMENT_APPROVED"
     PAYMENT_REJECTED = "PAYMENT_REJECTED"
+    ASSISTANT_QUERY = "ASSISTANT_QUERY"
+    ASSISTANT_RESPONSE = "ASSISTANT_RESPONSE"
 
     def __init__(self, repository: AuditLogRepository):
         self.repository = repository

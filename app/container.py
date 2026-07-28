@@ -531,6 +531,51 @@ def create_audit_service(
     return AuditService(AuditLogRepository(db))
 
 
+def create_assistant_service(
+    db=None,
+    llm=None,
+):
+    """Compose the read-only AI financial assistant.
+
+    ``llm`` defaults to the real OpenAI-backed assistant LLM, but can be injected
+    (e.g. in tests) to avoid a live API key.
+    """
+
+    from app.ai.tools import ContractTool, PaymentTool, ReceiptTool
+    from app.ai.assistant.tools import AssistantToolExecutor
+    from app.ai.assistant.assistant_service import AssistantService
+
+    if db is None:
+        db = SessionLocal()
+
+    contract_service = ContractService(ContractRepository(db))
+    payment_service = PaymentService(PaymentRepository(db))
+
+    contract_tool = ContractTool(
+        contract_service,
+        create_contract_reporting_service(db=db),
+    )
+    payment_tool = PaymentTool(payment_service, contract_service)
+    receipt_tool = ReceiptTool(
+        create_receipt_reporting_service(db=db),
+        contract_service,
+    )
+
+    tool_executor = AssistantToolExecutor(contract_tool, payment_tool, receipt_tool)
+
+    if llm is None:
+        from app.ai.assistant.llm import OpenAIAssistantLLM
+
+        llm = OpenAIAssistantLLM()
+
+    return AssistantService(
+        create_conversation_memory_service(db=db),
+        tool_executor,
+        llm,
+        audit_service=create_audit_service(db=db),
+    )
+
+
 def create_contract_service(
     db=None,
 ) -> ContractService:

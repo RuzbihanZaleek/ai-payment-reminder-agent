@@ -448,6 +448,20 @@ without touching routers. It is disabled under `APP_ENV=testing`.
   approve/reject, contract creation) are written to `audit_logs` via
   `AuditService`. Secrets are never stored.
 
+### AI financial assistant
+
+`POST /assistant/chat` (auth required; also `/api/v1/assistant/chat`) lets a user
+ask natural-language financial questions ("How much does John still need to
+pay?"). It is **strictly read-only** — it never creates payments, modifies
+contracts, sends reminders, or approves anything. Flow (`app/ai/`): detect
+intent (LLM) → select read-only tools by intent → tools call the existing
+domain/reporting **services** (tenant-scoped, never repositories) → the LLM
+phrases an answer **only** from the returned data (it never invents figures).
+Conversation memory is reused (`ConversationMemoryService`, keyed
+`assistant:user:{id}`); `ASSISTANT_QUERY`/`ASSISTANT_RESPONSE` are audited with
+intent, duration, and tool calls (never message content or secrets). The LLM is
+injectable, so tests run without an API key.
+
 ### Operations & recovery
 
 - **Stuck-message recovery** — the worker, on each run, returns any message
