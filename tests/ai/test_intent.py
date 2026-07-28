@@ -10,15 +10,23 @@ def test_intent_defaults_to_unknown():
     assert result.contract_reference is None
 
 
-def test_all_intents_present():
-    assert {i.value for i in AssistantIntent} == {
-        "CONTRACT_STATUS",
-        "PAYMENT_HISTORY",
-        "BALANCE_QUERY",
-        "NEXT_PAYMENT",
-        "GENERAL_FINANCIAL_QUERY",
-        "UNKNOWN",
-    }
+def test_core_and_insight_intents_present():
+    values = {i.value for i in AssistantIntent}
+
+    # Phase 11.1 core intents.
+    assert {
+        "CONTRACT_STATUS", "PAYMENT_HISTORY", "BALANCE_QUERY",
+        "NEXT_PAYMENT", "GENERAL_FINANCIAL_QUERY", "UNKNOWN",
+    } <= values
+
+    # Phase 11.2 insight intents.
+    assert {
+        "FINANCIAL_SUMMARY", "CONTRACT_ANALYTICS", "PAYMENT_ANALYTICS",
+        "TREND_ANALYSIS", "MONTHLY_REPORT", "TOP_DEBTORS", "TOP_PERFORMERS",
+        "OVERDUE_CONTRACTS", "PAYMENT_BEHAVIOR", "PAYMENT_TRENDS",
+        "ROI_ANALYSIS", "CASHFLOW_ANALYSIS", "REMINDER_ANALYTICS",
+        "FINANCIAL_RECOMMENDATION",
+    } <= values
 
 
 def test_parses_documented_example():

@@ -541,27 +541,59 @@ def create_assistant_service(
     (e.g. in tests) to avoid a live API key.
     """
 
-    from app.ai.tools import ContractTool, PaymentTool, ReceiptTool
+    from app.ai.tools import (
+        ContractTool,
+        PaymentTool,
+        ReceiptTool,
+        FinancialInsightTool,
+        ContractInsightTool,
+        PaymentInsightTool,
+        SchedulerInsightTool,
+        RecommendationTool,
+    )
     from app.ai.assistant.tools import AssistantToolExecutor
     from app.ai.assistant.assistant_service import AssistantService
+    from app.services.insights import (
+        FinancialInsightService,
+        ContractInsightService,
+        PaymentInsightService,
+        SchedulerInsightService,
+    )
+    from app.services.insights.recommendation_service import RecommendationService
 
     if db is None:
         db = SessionLocal()
 
     contract_service = ContractService(ContractRepository(db))
     payment_service = PaymentService(PaymentRepository(db))
+    contract_reporting_service = create_contract_reporting_service(db=db)
 
-    contract_tool = ContractTool(
-        contract_service,
-        create_contract_reporting_service(db=db),
-    )
+    # Phase 11.1 tools.
+    contract_tool = ContractTool(contract_service, contract_reporting_service)
     payment_tool = PaymentTool(payment_service, contract_service)
-    receipt_tool = ReceiptTool(
-        create_receipt_reporting_service(db=db),
-        contract_service,
+    receipt_tool = ReceiptTool(create_receipt_reporting_service(db=db), contract_service)
+
+    # Phase 11.2 insight services (own all calculations) + their tools.
+    financial_insight = FinancialInsightService(
+        contract_service, payment_service, contract_reporting_service
+    )
+    contract_insight = ContractInsightService(contract_service, payment_service)
+    payment_insight = PaymentInsightService(payment_service, contract_service)
+    scheduler_insight = SchedulerInsightService(create_scheduler_reporting_service(db=db))
+    recommendation = RecommendationService(
+        financial_insight, contract_insight, payment_insight
     )
 
-    tool_executor = AssistantToolExecutor(contract_tool, payment_tool, receipt_tool)
+    tool_executor = AssistantToolExecutor(
+        contract_tool,
+        payment_tool,
+        receipt_tool,
+        financial_insight_tool=FinancialInsightTool(financial_insight),
+        contract_insight_tool=ContractInsightTool(contract_insight),
+        payment_insight_tool=PaymentInsightTool(payment_insight),
+        scheduler_insight_tool=SchedulerInsightTool(scheduler_insight),
+        recommendation_tool=RecommendationTool(recommendation),
+    )
 
     if llm is None:
         from app.ai.assistant.llm import OpenAIAssistantLLM

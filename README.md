@@ -462,6 +462,15 @@ Conversation memory is reused (`ConversationMemoryService`, keyed
 intent, duration, and tool calls (never message content or secrets). The LLM is
 injectable, so tests run without an API key.
 
+It also acts as a **financial advisor**: portfolio health, collection rate, ROI,
+cashflow, contract performance (overdue / near-completion), payment behaviour
+(trends, consistency, top/slow payers), reminder analytics, and grounded
+**recommendations** ("INV004 is almost completed", "collection rate exceeds
+90%", "most capital concentrated in one contract"). All insight math lives in
+`app/services/insights/` (reusing existing services — never re-implementing
+approval/balance rules); the tools/executor/LLM never calculate. Intent →
+insight-tool routing is deterministic in `AssistantToolExecutor`.
+
 ### Operations & recovery
 
 - **Stuck-message recovery** — the worker, on each run, returns any message
