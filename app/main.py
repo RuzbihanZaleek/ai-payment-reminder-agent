@@ -18,6 +18,7 @@ from app.api.auth import router as auth_router
 from app.api.agent import router as agent_router
 from app.api.whatsapp import router as whatsapp_router
 from app.api.approval import router as approval_router
+from app.api.contracts import router as contracts_router
 from app.api.reports.contracts import router as reports_contracts_router
 from app.api.reports.agent_runs import router as reports_agent_runs_router
 from app.api.reports.scheduler_runs import router as reports_scheduler_runs_router
@@ -108,6 +109,7 @@ app.include_router(whatsapp_router)
 app.include_router(auth_router)
 app.include_router(agent_router)
 app.include_router(approval_router)
+app.include_router(contracts_router)
 app.include_router(reports_contracts_router)
 app.include_router(reports_agent_runs_router)
 app.include_router(reports_scheduler_runs_router)
