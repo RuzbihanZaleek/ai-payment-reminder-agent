@@ -127,7 +127,10 @@ def _extract_message(payload: dict):
     return None
 
 
+# Both paths map to the same handler so Meta can point at either the short
+# `/webhook` or the conventional `/webhooks/whatsapp`. One implementation.
 @router.get("/webhook")
+@router.get("/webhooks/whatsapp")
 def verify_webhook(
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
     hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
@@ -144,6 +147,7 @@ def verify_webhook(
 
 
 @router.post("/webhook", dependencies=[Depends(rate_limit_webhook)])
+@router.post("/webhooks/whatsapp", dependencies=[Depends(rate_limit_webhook)])
 def receive_webhook(
     payload: dict = Body(...),
     contract_repository: ContractRepository = Depends(get_contract_repository),

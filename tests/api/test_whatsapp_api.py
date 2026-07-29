@@ -272,6 +272,59 @@ def test_valid_incoming_message(overrides):
     assert service.calls == [(7, "wamid.abc", "I paid 250")]
 
 
+# --- /webhooks/whatsapp path alias (Phase 2) --------------------------------
+
+def test_webhook_verification_success_on_whatsapp_alias(monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_VERIFY_TOKEN", "test-token")
+
+    response = client.get(
+        "/webhooks/whatsapp",
+        params={
+            "hub.mode": "subscribe",
+            "hub.verify_token": "test-token",
+            "hub.challenge": "CHALLENGE_123",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text == "CHALLENGE_123"
+
+
+def test_invalid_verification_token_on_whatsapp_alias(monkeypatch):
+    monkeypatch.setattr(settings, "WHATSAPP_VERIFY_TOKEN", "test-token")
+
+    response = client.get(
+        "/webhooks/whatsapp",
+        params={
+            "hub.mode": "subscribe",
+            "hub.verify_token": "wrong-token",
+            "hub.challenge": "CHALLENGE_123",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_incoming_message_on_whatsapp_alias(overrides):
+    # The alias reuses the exact same handler as /webhook.
+    repo = FakeContractRepository(contract=FakeContract(contract_id=7))
+    service = FakeService()
+
+    overrides(contract_repository=repo, service=service)
+
+    response = client.post(
+        "/webhooks/whatsapp",
+        json=_message_payload(
+            message_id="wamid.alias",
+            phone="15559999999",
+            body="I paid 250",
+        ),
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [(7, "wamid.alias", "I paid 250")]
+
+
 def test_payload_without_messages(overrides):
 
     repo = FakeContractRepository(contract=FakeContract(contract_id=7))
