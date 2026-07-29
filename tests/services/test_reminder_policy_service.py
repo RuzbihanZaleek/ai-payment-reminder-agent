@@ -1,13 +1,24 @@
+from datetime import date, timedelta
 from decimal import Decimal
 
+from app.models.contract import ContractStatus
 from app.services.reminder_policy_service import ReminderPolicyService
 
 
 class FakeContract:
 
-    def __init__(self, contract_id=1, total_amount=Decimal("1000")):
+    def __init__(
+        self,
+        contract_id=1,
+        total_amount=Decimal("1000"),
+        status=ContractStatus.ACTIVE,
+        start_date=None,
+    ):
         self.id = contract_id
         self.total_amount = total_amount
+        self.status = status
+        # Default to a contract that has already started (yesterday).
+        self.start_date = start_date or (date.today() - timedelta(days=1))
 
 
 class FakePaymentService:
@@ -84,3 +95,28 @@ def test_eligible_reminder_returns_true():
     )
 
     assert policy.should_send_reminder(FakeContract()) is True
+
+
+def test_inactive_contract_is_not_reminded():
+
+    # A contract that is owed money but not ACTIVE must never be reminded.
+    policy = _policy(remaining=Decimal("500"))
+
+    for status in (
+        ContractStatus.PAUSED,
+        ContractStatus.CANCELLED,
+        ContractStatus.COMPLETED,
+    ):
+        contract = FakeContract(status=status)
+
+        assert policy.should_send_reminder(contract) is False
+
+
+def test_not_yet_started_contract_is_not_reminded():
+
+    # An active contract whose start date is in the future is not due yet.
+    policy = _policy(remaining=Decimal("500"))
+
+    contract = FakeContract(start_date=date.today() + timedelta(days=1))
+
+    assert policy.should_send_reminder(contract) is False

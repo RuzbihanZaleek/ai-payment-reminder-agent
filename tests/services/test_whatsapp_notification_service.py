@@ -1,3 +1,6 @@
+from datetime import date
+from decimal import Decimal
+
 import httpx
 import pytest
 
@@ -30,13 +33,15 @@ class RecordingPost:
         return self.response
 
 
-def _service():
+def _service(reminder_template_name="", reminder_template_language="en_US"):
 
     return WhatsAppNotificationService(
         access_token="TOKEN_ABC",
         phone_number_id="PHONE_123",
         api_version="v21.0",
         retry_delay_seconds=0,  # no real backoff sleeping in tests
+        reminder_template_name=reminder_template_name,
+        reminder_template_language=reminder_template_language,
     )
 
 
@@ -109,3 +114,81 @@ def test_correct_payload_is_sent(monkeypatch):
         "type": "text",
         "text": {"body": "Your balance is $50"},
     }
+
+
+def test_reminder_template_builds_expected_payload(monkeypatch):
+
+    recorder = RecordingPost(response=FakeResponse(status_code=200))
+    _patch_post(monkeypatch, recorder)
+
+    service = _service(reminder_template_name="payment_reminder")
+
+    result = service.send_payment_reminder_template(
+        "15551234567",
+        name="John",
+        amount=Decimal("20"),
+        due_date=date(2026, 7, 30),
+    )
+
+    assert result is True
+
+    call = recorder.calls[0]
+
+    assert call["url"] == (
+        "https://graph.facebook.com/v21.0/PHONE_123/messages"
+    )
+    assert call["json"] == {
+        "messaging_product": "whatsapp",
+        "to": "15551234567",
+        "type": "template",
+        "template": {
+            "name": "payment_reminder",
+            "language": {"code": "en_US"},
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": "John"},
+                        {"type": "text", "text": "$20"},
+                        {"type": "text", "text": "2026-07-30"},
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def test_reminder_template_failure_returns_false(monkeypatch):
+
+    recorder = RecordingPost(response=FakeResponse(status_code=400, text="bad"))
+    _patch_post(monkeypatch, recorder)
+
+    service = _service(reminder_template_name="payment_reminder")
+
+    result = service.send_payment_reminder_template(
+        "15551234567",
+        name="John",
+        amount=Decimal("20"),
+        due_date=date(2026, 7, 30),
+    )
+
+    assert result is False
+
+
+def test_reminder_template_retries_on_transport_error(monkeypatch):
+
+    recorder = RecordingPost(exc=httpx.RequestError("network down"))
+    _patch_post(monkeypatch, recorder)
+
+    service = _service(reminder_template_name="payment_reminder")
+
+    result = service.send_payment_reminder_template(
+        "15551234567",
+        name="John",
+        amount=Decimal("20"),
+        due_date=date(2026, 7, 30),
+    )
+
+    # Transport errors are retried, then reported as a failed delivery.
+    assert result is False
+    assert len(recorder.calls) > 1

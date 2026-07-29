@@ -32,6 +32,11 @@ class AgentState(BaseModel):
     contract_id: Optional[int] = None
     whatsapp_chat_id: Optional[str] = None
 
+    # Scheduled-reminder template context (populated only for reminders, used to
+    # fill the WhatsApp reminder template's placeholders).
+    contract_name: Optional[str] = None
+    due_date: Optional[date] = None
+
     # Multi-contract support
     # resolved_contracts: the sender's active contracts (candidate pool,
     # lightweight dicts) resolved from the phone number.

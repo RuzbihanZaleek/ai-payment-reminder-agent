@@ -254,6 +254,8 @@ def create_reminder_workflow(
         max_retries=settings.WHATSAPP_MAX_RETRIES,
         retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
         timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
+        reminder_template_name=settings.WHATSAPP_REMINDER_TEMPLATE_NAME,
+        reminder_template_language=settings.WHATSAPP_REMINDER_TEMPLATE_LANGUAGE,
     )
 
     return ReminderWorkflow(
@@ -266,6 +268,7 @@ def create_reminder_workflow(
                 NotificationOutboxRepository(db)
             ),
             notification_mode=settings.NOTIFICATION_MODE,
+            reminder_template_name=settings.WHATSAPP_REMINDER_TEMPLATE_NAME,
         ),
         workflow_executor,
     )
@@ -615,6 +618,8 @@ def create_whatsapp_notification_service():
         max_retries=settings.WHATSAPP_MAX_RETRIES,
         retry_delay_seconds=settings.WHATSAPP_RETRY_DELAY_SECONDS,
         timeout_seconds=settings.WHATSAPP_TIMEOUT_SECONDS,
+        reminder_template_name=settings.WHATSAPP_REMINDER_TEMPLATE_NAME,
+        reminder_template_language=settings.WHATSAPP_REMINDER_TEMPLATE_LANGUAGE,
     )
 
 
