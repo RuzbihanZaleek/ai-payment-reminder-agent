@@ -562,9 +562,38 @@ Production notes baked into the image / compose file:
 - Container `HEALTHCHECK` hits `/health`; Postgres has a `pg_isready` healthcheck
   and the app waits for `service_healthy` before starting.
 - `restart: unless-stopped` on both services.
-- The `.:/app` bind mount is a **dev convenience** — remove it for a real
-  deployment so the image is the single source of truth.
-- Rebuild the image after changing `requirements.txt`.
+- Rebuild the image after changing `requirements.txt` (dependencies are pinned).
+
+## Development vs production deployment
+
+Two compose files, one image:
+
+| | Development (`docker-compose.yml`) | Production (`docker-compose.prod.yml`) |
+| --- | --- | --- |
+| Source | `.:/app` **bind mount** (edit-and-reload) | **no mount** — the built image is the single source of truth |
+| PostgreSQL port | published `5433:5432` (host access for tooling) | **not published** — reachable only over the private Docker network |
+| Network | default compose network | explicit `app-network` (bridge) |
+| Log rotation | none (dev) | `json-file`, `max-size 10m`, `max-file 5` on both services |
+| Health checks / restart | yes | yes |
+
+Start each environment:
+
+```bash
+# Development — bind mount + exposed Postgres, rebuild on dependency changes.
+docker compose up --build
+
+# Production — immutable image, Postgres internal-only, log rotation.
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Both files use `env_file: .env`. In production, supply `.env` (or inject the
+same variables from your platform's secret store) with `APP_ENV=production`,
+locked-down CORS, a strong DB password, and a high-entropy `JWT_SECRET_KEY`.
+Run migrations as an explicit deploy step after the containers are up:
+
+```bash
+docker compose -f docker-compose.prod.yml exec app alembic upgrade head
+```
 
 ---
 

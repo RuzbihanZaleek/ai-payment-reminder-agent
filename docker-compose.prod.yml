@@ -1,0 +1,87 @@
+# Production compose. Start with:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from the development docker-compose.yml:
+#   - NO source bind mount: the built image is the single source of truth.
+#   - PostgreSQL is NOT published to the host; it is reachable only over the
+#     private Docker network.
+#   - Explicit app-network and Docker log rotation on both services.
+
+services:
+
+  app:
+    container_name: payment_reminder_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # The API is the only publicly exposed port.
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    # Only start the API once the database is actually accepting connections.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    networks:
+      - app-network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+
+  postgres:
+    container_name: payment_reminder_db
+
+    image: postgres:16
+
+    # No host port: PostgreSQL is reachable only from other containers on
+    # app-network (the `app` service connects via host "postgres").
+    expose:
+      - "5432"
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: payment_reminder
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_reminder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    restart: unless-stopped
+
+    networks:
+      - app-network
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+
+volumes:
+
+  postgres_data:
+
+
+networks:
+
+  app-network:
+    driver: bridge

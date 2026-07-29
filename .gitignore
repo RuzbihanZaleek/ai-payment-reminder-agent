@@ -1,4 +1,33 @@
+# --- Secrets / environment --------------------------------------------------
 .env
+.env.*
+!.env.example
+
+# --- Virtual environments ---------------------------------------------------
 venv/
+.venv/
+env/
+
+# --- Python artifacts -------------------------------------------------------
 __pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# --- Test / coverage / type-check caches ------------------------------------
 .pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Editors / OS -----------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store
+
+# --- Logs / local databases -------------------------------------------------
+*.log
+*.sqlite3
