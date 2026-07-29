@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.models.contract import Contract
+from app.models.contract import Contract, ContractStatus
 from app.repositories.payment_repository import PaymentRepository
 from app.repositories.reminder_log_repository import ReminderLogRepository
 from app.services.payment_service import PaymentService
@@ -19,6 +19,15 @@ class ReminderPolicyService:
         self.reminder_log_repository = reminder_log_repository
 
     def should_send_reminder(self, contract: Contract) -> bool:
+
+        # 0. Only active, already-started contracts are reminded. A paused/
+        # cancelled/completed contract, or one whose start date is in the
+        # future, is never due a reminder.
+        if contract.status != ContractStatus.ACTIVE:
+            return False
+
+        if contract.start_date is not None and contract.start_date > date.today():
+            return False
 
         # 1. Nothing owed -> no reminder.
         remaining = self.payment_service.calculate_remaining_amount(

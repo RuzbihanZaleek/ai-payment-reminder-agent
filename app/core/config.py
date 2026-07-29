@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_API_VERSION: str = "v25.0"
 
+    # Proactive payment reminders are business-initiated messages. Outside the
+    # 24h customer-service window Meta only delivers PRE-APPROVED templates, so
+    # scheduled reminders are sent as this template. Leave the name blank to fall
+    # back to plain text (dev/testing only -- real proactive text is rejected).
+    WHATSAPP_REMINDER_TEMPLATE_NAME: str = ""
+    WHATSAPP_REMINDER_TEMPLATE_LANGUAGE: str = "en_US"
+
     # --- Authentication / JWT ----------------------------------------------
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
@@ -65,6 +72,9 @@ class Settings(BaseSettings):
     # PostgreSQL advisory-lock key guarding the daily reminder job so only one
     # replica executes it. An arbitrary but stable 64-bit integer.
     SCHEDULER_LOCK_ID: int = 902_025_105
+    # Wall-clock timezone the daily reminder fires in (IANA name, e.g.
+    # "America/New_York"). SCHEDULER_HOUR/MINUTE are interpreted in this zone.
+    REMINDER_TIMEZONE: str = "UTC"
 
     # --- WhatsApp delivery reliability -------------------------------------
     WHATSAPP_MAX_RETRIES: int = 3

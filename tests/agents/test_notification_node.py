@@ -1,3 +1,6 @@
+from datetime import date
+from decimal import Decimal
+
 from app.agents.notification_node import NotificationNode
 from app.agents.payment_detection_node import PaymentDetectionNode
 from app.agents.confidence_checker_node import ConfidenceCheckerNode
@@ -17,6 +20,20 @@ class RecordingNotificationService:
     def send(self, recipient, message):
 
         self.calls.append((recipient, message))
+
+        return self.result
+
+
+class RecordingTemplateNotificationService(RecordingNotificationService):
+    """A notification service that also supports reminder templates."""
+
+    def __init__(self, result=True):
+        super().__init__(result=result)
+        self.template_calls = []
+
+    def send_payment_reminder_template(self, recipient, name, amount, due_date):
+
+        self.template_calls.append((recipient, name, amount, due_date))
 
         return self.result
 
@@ -134,6 +151,90 @@ def test_reminder_failure_creates_no_log():
     node.execute(state)
 
     assert log_repo.created == []
+
+
+def test_reminder_uses_template_when_configured():
+
+    service = RecordingTemplateNotificationService(result=True)
+    log_repo = FakeReminderLogRepository()
+
+    node = NotificationNode(
+        service, log_repo, reminder_template_name="payment_reminder"
+    )
+
+    state = AgentState(
+        trigger_type=TriggerType.SCHEDULED_REMINDER,
+        message="",
+        contract_id=7,
+        whatsapp_chat_id="chat_123",
+        contract_name="John",
+        daily_amount=Decimal("20"),
+        due_date=date(2026, 7, 30),
+        generated_message="Friendly reminder: balance $50.",
+    )
+
+    result = node.execute(state)
+
+    # Delivered via the approved template, NOT as free-form text.
+    assert service.template_calls == [
+        ("chat_123", "John", Decimal("20"), date(2026, 7, 30))
+    ]
+    assert service.calls == []
+    assert result.notification_status == "SENT"
+
+    # The reminder is still logged (with the human-readable text) for dedup.
+    assert len(log_repo.created) == 1
+    assert log_repo.created[0].contract_id == 7
+
+
+def test_reminder_falls_back_to_text_without_template():
+
+    service = RecordingTemplateNotificationService(result=True)
+    log_repo = FakeReminderLogRepository()
+
+    # No template configured -> plain text (dev/testing behavior).
+    node = NotificationNode(service, log_repo, reminder_template_name="")
+
+    state = AgentState(
+        trigger_type=TriggerType.SCHEDULED_REMINDER,
+        message="",
+        contract_id=7,
+        whatsapp_chat_id="chat_123",
+        contract_name="John",
+        daily_amount=Decimal("20"),
+        due_date=date(2026, 7, 30),
+        generated_message="Friendly reminder: balance $50.",
+    )
+
+    node.execute(state)
+
+    assert service.template_calls == []
+    assert service.calls == [("chat_123", "Friendly reminder: balance $50.")]
+
+
+def test_payment_message_never_uses_template():
+
+    service = RecordingTemplateNotificationService(result=True)
+    log_repo = FakeReminderLogRepository()
+
+    # Template is configured, but a MESSAGE-triggered (payment) reply must stay
+    # free-form text -- templates are only for proactive reminders.
+    node = NotificationNode(
+        service, log_repo, reminder_template_name="payment_reminder"
+    )
+
+    state = AgentState(
+        trigger_type=TriggerType.MESSAGE,
+        message="Paid 100",
+        contract_id=7,
+        whatsapp_chat_id="chat_123",
+        generated_message="Thanks for your payment.",
+    )
+
+    node.execute(state)
+
+    assert service.template_calls == []
+    assert service.calls == [("chat_123", "Thanks for your payment.")]
 
 
 def test_payment_notification_creates_no_log():

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.agents.state import AgentState
 from app.agents.reminder_workflow import ReminderWorkflow
@@ -45,6 +45,8 @@ class ReminderExecutionService:
             message="",
             contract_id=contract.id,
             whatsapp_chat_id=contract.whatsapp_chat_id,
+            contract_name=contract.name,
+            due_date=date.today(),
             total_amount=contract.total_amount,
             daily_amount=contract.daily_amount,
             remaining_amount=remaining_amount,

@@ -402,6 +402,7 @@ def create_scheduler() -> BackgroundScheduler:
         trigger=CronTrigger(
             hour=settings.SCHEDULER_HOUR,
             minute=settings.SCHEDULER_MINUTE,
+            timezone=settings.REMINDER_TIMEZONE,
         ),
         id=_JOB_ID,
         replace_existing=True,

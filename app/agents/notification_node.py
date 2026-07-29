@@ -22,11 +22,13 @@ class NotificationNode:
         reminder_log_repository: ReminderLogRepository,
         notification_outbox_service=None,
         notification_mode: str = "direct",
+        reminder_template_name: str = "",
     ):
         self.notification_service = notification_service
         self.reminder_log_repository = reminder_log_repository
         self.notification_outbox_service = notification_outbox_service
         self.notification_mode = notification_mode
+        self.reminder_template_name = reminder_template_name
 
     def execute(
         self,
@@ -50,10 +52,7 @@ class NotificationNode:
 
     def _execute_direct(self, state: AgentState) -> AgentState:
 
-        success = self.notification_service.send(
-            state.whatsapp_chat_id,
-            state.generated_message,
-        )
+        success = self._deliver(state)
 
         if success:
             state.notification_sent = True
@@ -65,6 +64,32 @@ class NotificationNode:
         self._maybe_log_reminder(state)
 
         return state
+
+    def _deliver(self, state: AgentState) -> bool:
+
+        # Scheduled reminders are business-initiated, so they must go out as an
+        # approved template when one is configured. Everything else (payment
+        # confirmations, in-session replies) stays free-form text.
+        if self._should_use_template(state):
+            return self.notification_service.send_payment_reminder_template(
+                state.whatsapp_chat_id,
+                state.contract_name,
+                state.daily_amount,
+                state.due_date,
+            )
+
+        return self.notification_service.send(
+            state.whatsapp_chat_id,
+            state.generated_message,
+        )
+
+    def _should_use_template(self, state: AgentState) -> bool:
+
+        return (
+            state.trigger_type == TriggerType.SCHEDULED_REMINDER
+            and bool(self.reminder_template_name)
+            and hasattr(self.notification_service, "send_payment_reminder_template")
+        )
 
     def _execute_outbox(self, state: AgentState) -> AgentState:
 

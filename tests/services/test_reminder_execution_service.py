@@ -9,6 +9,7 @@ class FakeContract:
 
     def __init__(self):
         self.id = 5
+        self.name = "John"
         self.total_amount = Decimal("1000")
         self.daily_amount = Decimal("20")
         self.whatsapp_chat_id = "chat_555"
@@ -79,6 +80,8 @@ def test_reminder_execution_creates_correct_state():
     assert state.total_amount == Decimal("1000")
     assert state.daily_amount == Decimal("20")
     assert state.remaining_amount == Decimal("850")
+    assert state.contract_name == "John"
+    assert state.due_date is not None
     assert agent_run_id == 1
 
     # The reminder path never runs PaymentDetectionNode, so no detection
