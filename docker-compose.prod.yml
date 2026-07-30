@@ -81,7 +81,9 @@ services:
 
     container_name: payagent-tunnel
 
-    command: tunnel --no-autoupdate run --token eyJhIjoiZjBkNjVmMThlOGQ1MWM4YmYwMWI0YTcxZTJjZjRmNTkiLCJ0IjoiY2NlMTlkMjUtYTI2Ni00ZDlkLWJjYzUtYmJjMmFlMWI2MzFhIiwicyI6Ik5tTTFOREExWXpZdFl6RmxPUzAwTlRaaUxUaGhZamd0Wmpka09USTROVGxqTXpNMiJ9
+    # Token comes from the gitignored .env (never commit it). Rotate in the
+    # Cloudflare dashboard if it is ever exposed.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
 
     restart: unless-stopped
 
